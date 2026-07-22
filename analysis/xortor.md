@@ -368,34 +368,64 @@ The archive's string table nonetheless revealed its contents: `pyinstaller-6.20.
 
 ## Campaign evolution
 
-A second build was analysed on 2026-07-22:
-`149ab46739ca442762502a69f0960365a7c5e7761c76f2e6c2997bd43744a62a`
+Three builds analysed:
 
-The dropper is byte-identical apart from its icon resource — every section
-matches in size and entropy except `.rsrc` (19,968 vs 18,432 bytes). Same
-bootloader, same 150 imports, different payload.
+| # | SHA-256 | Compiled (TimeDateStamp) |
+|---|---|---|
+| 1 | `448776210b0c1802fd3e5da66813e90e7469bcd365d64e11b2a992547bc2fd4a` | — |
+| 2 | `149ab46739ca442762502a69f0960365a7c5e7761c76f2e6c2997bd43744a62a` | `0x6a611c70` |
+| 3 | `78ef4cadec54dfda9055668975351cb20566d65be346536fa0f0eb7c8945203d` | `0x6a612aac` |
 
-| Element | Build 1 | Build 2 | Status |
-|---|---|---|---|
-| XOR key | `tgn5AIyxKkQi` | `9famr2xoY773` | **rotated** |
-| `002_b.js` (WordPress) | `c49dc645...` | `c49dc645...` | **identical** |
-| WordPress C2 | `sqwzutzq7b`+`3ad.onion/` | same | **static** |
-| BIP-39 list, 40k addresses | 15,162 / 1,519,563 | same sizes | **static** |
-| Clipper wallets | `jZh3AMaxrk`… | `12FfZsjyDr`, `bc1qz33n9x`, `rvCKiLmRnr`, `aACxfnXrKP` | **rotated** |
-| Clipper C2 | `ffeasxsfee`… | `http://hek`+`x47vp3k7pg`+`ffeasxsfee` | partially reused |
-| Gate path | — | `core/repla`+`.php` | present in both |
-| New behaviour | — | WMI `Terminate` against `wscript`/`cscript` | added |
+Builds 2 and 3 were compiled **3,644 seconds apart — roughly one hour**.
+This is automated output, not hand-assembled samples.
 
-**Assessment.** The WordPress module is frozen; the clipper is where the
-operator invests. Wallets and the XOR key rotate per build, but the
-`ffeasxsfee` C2 fragment persists across both — infrastructure is only
-partially rotated.
+The dropper is byte-identical across all three except for its icon resource
+(`.rsrc`: 19,968 / 18,432 / 19,456). Every other section matches exactly in
+size and entropy; all three carry the same 150 imports.
 
-**Detection impact.** `XORTOR_Encrypted_Payload` failed against build 2, as
-predicted in §7.3. `XORTOR_XORed_PE_KeyAgnostic` was written in response and
-keys on PE header structure rather than key material; it matches both builds.
+### What rotates, what does not
+
+| Element | Build 1 | Build 2 | Build 3 | Status |
+|---|---|---|---|---|
+| XOR key | `tgn5AIyxKkQi` | `9famr2xoY773` | `K6ngtB2dEud6` | **rotates every build** |
+| `002_b.js` (WordPress) | `c49dc645…` | `c49dc645…` | `c49dc645…` | **never touched** |
+| WordPress C2 | `sqwzutzq7b`+`3ad.onion/` | same | same | **static** |
+| BIP-39 list / 40k addresses | `002w.txt` / `002a.txt` | identical | identical | **static** |
+| `002_n.js` (clipper) | v1 | v2 | **v2, byte-identical to build 2** | updated once |
+| Clipper wallets | `jZh3AMaxrk`… | `12FfZsjyDr`, `bc1qz33n9x`, `rvCKiLmRnr`, `aACxfnXrKP` | same as build 2 | updated once |
+| Clipper C2 | `ffeasxsfee`… | `http://hek`+`x47vp3k7pg`+`ffeasxsfee` | same as build 2 | partially reused |
+
+### Assessment
+
+Between builds 2 and 3 **nothing changed but the XOR key**. The decrypted
+payload set is byte-for-byte identical; only the encryption differs, and with
+it the file hash.
+
+The builder's primary function is therefore not payload development but
+**hash rotation**: repackaging an unchanged payload under a fresh random key
+to defeat signature-based detection. Keys are 12 bytes of mixed-case
+alphanumerics with no discernible pattern, consistent with random generation.
+
+The WordPress module has not been modified across any build. The clipper was
+updated once — new wallet addresses and a new C2 gate — while the
+`ffeasxsfee` fragment persisted, indicating only partial infrastructure
+rotation.
+
+### Detection impact
+
+Hash-based detection is worthless against this campaign: a new SHA-256
+appears roughly hourly for identical malware.
+
+`XORTOR_Encrypted_Payload`, which keyed on the literal key string, failed
+against build 2 exactly as predicted in §7.3. `XORTOR_XORed_PE_KeyAgnostic`
+was written in response, keying on the invariant relationship between the
+plaintext PE header and its NUL padding rather than on key material. It
+matched all three builds under three different keys.
+
 The JScript and C2-fragment rules survived rotation because they key on
-function names and the reused `ffeasxsfee` fragment.
+function names and the reused `ffeasxsfee` fragment — but the wallet and C2
+changes between builds 1 and 2 show these will eventually degrade. The
+structural rules carry the durable value.
 
 ---
 
