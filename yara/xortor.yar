@@ -206,3 +206,23 @@ rule XORTOR_Screenshot_Exfil
         4 of ($ps*)
         or ($art and 2 of ($ps*))
 }
+
+
+rule XORTOR_XORed_PE_KeyAgnostic
+{
+    meta:
+        description = "12-byte XOR encrypted PE payload - key independent"
+        author      = "Mustafa Emre"
+        date        = "2026-07-22"
+        reference   = "149ab46739ca442762502a69f0960365a7c5e7761c76f2e6c2997bd43744a62a"
+        confidence  = "high"
+        note        = "Plaintext PE header is MZ followed by NUL padding. With a 12-byte key, ciphertext bytes 12-15 encrypt NULs and therefore equal the key itself. XORing them against bytes 0-3 recovers the plaintext header regardless of key value. Survives key rotation; verified against two builds with different keys."
+
+    condition:
+        filesize > 100KB
+        and uint16(0) != 0x5A4D          // not already a plaintext PE
+        and uint8(0) ^ uint8(12) == 0x4D
+        and uint8(1) ^ uint8(13) == 0x5A
+        and uint8(2) ^ uint8(14) == 0x78
+        and uint8(3) ^ uint8(15) == 0x00
+}
