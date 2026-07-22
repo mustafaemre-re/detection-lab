@@ -1,0 +1,56 @@
+# =============================================================
+#  CRITICAL: no live malware in this repository.
+#  Committing samples violates GitHub ToS and constitutes
+#  malware distribution. Account termination follows.
+#  Ship analysis, rules and tooling. Never binaries.
+# =============================================================
+
+# Samples and anything derived from them
+samples/
+extracted/
+decrypted/
+*.exe
+*.exe_
+*.dll
+*.pyd
+*.pyc
+*.bin
+*.dat
+*.rar
+*.zip
+*.7z
+*.gz
+*.msi
+*.scr
+*.vbs
+*.js.enc
+payload*
+sample*
+
+# Analysis working files
+*.tmp
+*.log
+imports.txt
+strings.txt
+dump/
+work/
+
+# Ghidra
+*.gpr
+*.rep/
+ghidra_*/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.egg-info/
+
+# macOS
+.DS_Store
+._*
+
+# Editors
+.vscode/
+.idea/
+*.swp
