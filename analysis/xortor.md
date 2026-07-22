@@ -1,9 +1,19 @@
 # XORTOR — Analysis of a Tor-Based Modular Crimeware Platform
 
 **Author:** Mustafa Emre
-**Date:** 2026-07-18
+**Date:** 2026-07-18 (analysis) · 2026-07-22 (campaign update)
 **TLP:** CLEAR
-**Sample:** `448776210b0c1802fd3e5da66813e90e7469bcd365d64e11b2a992547bc2fd4a`
+
+**Samples analysed:**
+
+| # | SHA-256 |
+|---|---|
+| 1 | `448776210b0c1802fd3e5da66813e90e7469bcd365d64e11b2a992547bc2fd4a` |
+| 2 | `149ab46739ca442762502a69f0960365a7c5e7761c76f2e6c2997bd43744a62a` |
+| 3 | `78ef4cadec54dfda9055668975351cb20566d65be346536fa0f0eb7c8945203d` |
+
+Sections 2-8 describe build 1 in full. Section 9 covers what changes across
+all three builds.
 
 ---
 
@@ -13,11 +23,15 @@ A PyInstaller-packaged dropper delivers a modular crimeware platform that turns 
 
 The sample stacks four layers of obfuscation — a recompiled PyInstaller bootloader, a PyArmor-protected loader, a 12-byte repeating-XOR payload set, and `obfuscator.io`-processed JScript. Despite this, the entire payload set was recovered **statically, without execution and without possession of the key**, through frequency analysis.
 
-The chain's critical weakness is its choice of repeating-XOR over authenticated encryption: the key leaks through the NUL-padded regions of the encrypted PE, making the payload detectable **on disk in its encrypted state**.
+The chain's critical weakness is its choice of repeating-XOR over authenticated encryption: the key leaks through the NUL-padded regions of the encrypted PE, making the payload detectable **on disk in its encrypted state** — and detectable without knowing the key at all.
+
+Two further builds were analysed. The dropper is byte-identical apart from its icon; the XOR key rotates every build while the payload does not. The builder's primary function is **hash rotation**, not payload development (§9). A sandbox run of build 2 returned almost nothing, because the sample checks its environment and exits (§10).
 
 ---
 
 ## 2. Sample information
+
+Build 1 (see §9 for build 2 and 3 deltas).
 
 | Field | Value |
 |---|---|
@@ -243,29 +257,72 @@ Execution occurs through Windows Script Host: `ActiveXObject`, `WScript.Shell`, 
 
 ### Network
 
+C2 addresses are split into 10-character chunks inside the obfuscator string
+array and concatenated at runtime. The fragments below are what was recovered;
+**none reassembles to a complete 56-character v3 onion address**, so treat
+these as partial indicators rather than resolvable hosts.
+
 ```
-sqwzutzq7b[...]3ad.onion                                        (C2 #1, module B)
-ffeasxsfeexev2rvxfivi2wvkxre5vaxkjeepxzxva4u4ydm2qead.onion     (C2 #2, module N)
-127.0.0.1:9050                                                  (local Tor SOCKS proxy)
+Module B (WordPress) - all three builds:
+  sqwzutzq7b [...] 3ad.onion          (13 of 56 chars recovered)
+  additional fragments: yxoedle2gd, 1988hhzEeH, 12Qntcik, http://gfo
+
+Module N (clipper) - build 1:
+  ffeasxsfee xev2rvxfiv i2wvkxre5v axkjeepxzx va4u4ydm2q ead.onion
+  (53 of 56 chars recovered - incomplete)
+
+Module N (clipper) - builds 2 and 3:
+  http://hek [...] x47vp3k7pg ffeasxsfee [...]
+  gate path: core/repla[...].php
+
+Local:
+  127.0.0.1:9050                      (Tor SOCKS proxy)
 ```
 
-Additional fragments observed in module B: `yxoedle2gd`, `1988hhzEeH`, `12Qntcik`, `http://gfo`
+The `ffeasxsfee` fragment appears in every build. It is the single most
+durable network indicator observed.
 
 ### Cryptographic
 
+XOR keys rotate every build (see §9):
+
 ```
-XOR key: tgn5AIyxKkQi  (74 67 6e 35 41 49 79 78 4b 6b 51 69)
+build 1   tgn5AIyxKkQi   (74 67 6e 35 41 49 79 78 4b 6b 51 69)
+build 2   9famr2xoY773
+build 3   K6ngtB2dEud6
 ```
+
+All are 12 bytes of mixed-case alphanumerics; no pattern links them.
+Key values are therefore unsuitable as standalone indicators.
+
+### Wallet fragments
+
+```
+build 1   jZh3AMaxrk, Ws9hfanP5h, i1ir3EUU85, 32ozR62LxL, ox4tsxfxqw
+builds 2-3   12FfZsjyDr, bc1qz33n9x, rvCKiLmRnr, aACxfnXrKP, NheW, 5c82
+```
+
+Address families targeted: BTC P2PKH, BTC P2SH, BTC Bech32, TRON, Monero.
 
 ### Files
 
 ```
-SHA-256   448776210b0c1802fd3e5da66813e90e7469bcd365d64e11b2a992547bc2fd4a
+SHA-256   448776210b0c1802fd3e5da66813e90e7469bcd365d64e11b2a992547bc2fd4a  (build 1)
+          149ab46739ca442762502a69f0960365a7c5e7761c76f2e6c2997bd43744a62a  (build 2)
+          78ef4cadec54dfda9055668975351cb20566d65be346536fa0f0eb7c8945203d  (build 3)
+
+Decrypted payload hashes (stable across builds where noted):
+          c49dc64559ca84df2716113592b84ada7704e783a3e31b3ab42b531cc835e996  002_b.js (all builds)
+          a4ac942e07c0ce7e9982a8594ca5a5354f1389acae995b112f4424843579b6cc  002_n.js (builds 2-3)
+
 Bundled   campus.py, installer.pyc, uusd.exe, data_p002/,
           002_b.js, 002_n.js, pack.js, 002.xml, 002a.txt, 002w.txt
 Runtime   pyarmor_runtime_000000/pyarmor_runtime.pyd
 Dropped   %TEMP%\screenshot_*
 ```
+
+Dropper hashes are **not useful for detection** - a fresh one appears roughly
+hourly (§9). The decrypted payload hashes are stable and far more valuable.
 
 ### Behavioural
 
@@ -296,6 +353,16 @@ Dropped   %TEMP%\screenshot_*
 | Resource Development | T1583.003 — Botnet | Distributed worker architecture |
 | Impact | T1657 — Financial Theft | Clipper + seed brute-force |
 
+Added from dynamic analysis (§10):
+
+| Tactic | Technique | Evidence |
+|---|---|---|
+| Defense Evasion | T1562.001 — Disable or Modify Tools | Windows Defender modification via PowerShell |
+| Defense Evasion | T1497 — Virtualization/Sandbox Evasion | Kill-date check; exits early after reading local time |
+| Defense Evasion | T1070.004 — File Deletion | Anomalous deletion behaviour (10+ files) |
+| Discovery | T1614 — System Location Discovery | Locale query, consistent with geofencing |
+| Discovery | T1082 — System Information Discovery | Volume serial / hardware ID fingerprinting |
+
 ---
 
 ## 7. Detection opportunities
@@ -304,13 +371,25 @@ Dropped   %TEMP%\screenshot_*
 
 | Rule | Target | Layer |
 |---|---|---|
-| `XORTOR_Encrypted_Payload` | Encrypted PE, key rotations | **On-disk, pre-decryption** |
+| `XORTOR_XORed_PE_KeyAgnostic` | XOR-encrypted PE, **any key** | **On-disk, pre-decryption** |
+| `XORTOR_Encrypted_Payload` | Encrypted PE, build-1 key only | On-disk (superseded) |
 | `XORTOR_Dropper_PyInstaller_PyArmor` | Dropper | On-disk |
 | `XORTOR_JS_Modules_Decrypted` | JScript modules | Memory / post-decryption |
 | `XORTOR_C2_Onion_Fragments` | C2 fragments | Memory / post-decryption |
 | `XORTOR_Screenshot_Exfil` | PowerShell capture routine | Memory / post-decryption |
 
 **The key insight behind `XORTOR_Encrypted_Payload`:** PE headers are NUL-heavy, and `NUL XOR key == key`. The key therefore appears **in cleartext inside the ciphertext**, at an arbitrary rotation. Matching all twelve rotations detects the payload on disk without decryption — the encryption defeats itself.
+
+**Why `XORTOR_XORed_PE_KeyAgnostic` supersedes it.** The rule above still names a specific key, so it dies on the next build. The same property can be expressed without any key material at all. The plaintext PE header begins `4D 5A 78 00 01 00 00 00 04 00 00 00` followed by NUL padding, so with a 12-byte key, ciphertext bytes 12-15 encrypt NULs and equal the key. XORing them against bytes 0-3 recovers the plaintext regardless of key value:
+
+```
+uint8(0) ^ uint8(12) == 0x4D    (M)
+uint8(1) ^ uint8(13) == 0x5A    (Z)
+uint8(2) ^ uint8(14) == 0x78
+uint8(3) ^ uint8(15) == 0x00
+```
+
+A `uint16(0) != 0x5A4D` guard is required, otherwise the condition holds for every plaintext PE — bytes 12-15 of a normal PE are already NUL, so XORing changes nothing. Without that guard the rule fires on every Windows executable on the system. This was caught in testing, not in review.
 
 ### 7.2 Behavioural (higher-value, campaign-independent)
 
@@ -328,6 +407,8 @@ These survive rebuilds; the static indicators do not.
 - **`XORTOR_Encrypted_Payload` only fires on the encrypted PE.** Verified: it matches `uusd.exe` but not the encrypted `002_b.js`, `002_n.js`, `002.xml`, `002a.txt`, `002w.txt`. Key leakage requires **12 consecutive NUL bytes**. Plaintext files have none; `002.xml` is UTF-16 with alternating NULs, which never produces a 12-byte run. The rule's true scope is "XOR-encrypted PE", not "XOR-encrypted file".
 - **JScript rules fire on decrypted content only.** These files never touch disk in cleartext. Effective for memory scanning (`yara -p`) or EDR in-memory rules; ineffective for on-disk scanning.
 - **String-based rules are brittle.** Rebuilding with a new XOR key defeats `XORTOR_Encrypted_Payload`; rotating C2 defeats `XORTOR_C2_Onion_Fragments`. The behavioural detections in 7.2 carry the durable value.
+  **Confirmed in practice.** Build 2 used a different key and `XORTOR_Encrypted_Payload` produced no match, exactly as predicted. `XORTOR_XORed_PE_KeyAgnostic` was written in response and matched all three builds under three distinct keys.
+- **`XORTOR_C2_Onion_Fragments` is on borrowed time.** It survives builds 1-3 because the `ffeasxsfee` fragment was reused, but the clipper C2 and wallet set already changed once between builds 1 and 2. Expect this rule to degrade.
 
 ### 7.4 False positives observed and resolved
 
@@ -366,7 +447,7 @@ The archive's string table nonetheless revealed its contents: `pyinstaller-6.20.
 
 ---
 
-## Campaign evolution
+## 9. Campaign evolution
 
 Three builds analysed:
 
@@ -383,7 +464,7 @@ The dropper is byte-identical across all three except for its icon resource
 (`.rsrc`: 19,968 / 18,432 / 19,456). Every other section matches exactly in
 size and entropy; all three carry the same 150 imports.
 
-### What rotates, what does not
+### 9.1 What rotates, what does not
 
 | Element | Build 1 | Build 2 | Build 3 | Status |
 |---|---|---|---|---|
@@ -395,7 +476,7 @@ size and entropy; all three carry the same 150 imports.
 | Clipper wallets | `jZh3AMaxrk`… | `12FfZsjyDr`, `bc1qz33n9x`, `rvCKiLmRnr`, `aACxfnXrKP` | same as build 2 | updated once |
 | Clipper C2 | `ffeasxsfee`… | `http://hek`+`x47vp3k7pg`+`ffeasxsfee` | same as build 2 | partially reused |
 
-### Assessment
+### 9.2 Assessment
 
 Between builds 2 and 3 **nothing changed but the XOR key**. The decrypted
 payload set is byte-for-byte identical; only the encryption differs, and with
@@ -411,7 +492,7 @@ updated once — new wallet addresses and a new C2 gate — while the
 `ffeasxsfee` fragment persisted, indicating only partial infrastructure
 rotation.
 
-### Detection impact
+### 9.3 Detection impact
 
 Hash-based detection is worthless against this campaign: a new SHA-256
 appears roughly hourly for identical malware.
@@ -429,19 +510,73 @@ structural rules carry the durable value.
 
 ---
 
-## 9. Assessment
+## 10. Static versus dynamic analysis
 
-This is not a single malware family. It is a **modular platform** with independent monetisation paths sharing common infrastructure — bot identity, task queue, result store, Tor transport. The `pack.js` template with its `%D%`/`%P%` placeholders confirms a builder, implying additional samples with different keys, different C2, and potentially different modules.
+Build 2 was submitted to CAPE Sandbox (analysis 75711, 241 seconds, Windows 10 KVM).
+
+### Confirmed by dynamic analysis
+
+- **`Packer: PyInstaller [overlay; modified]`** — independent confirmation of
+  the recompiled bootloader identified statically in §8
+- **Build fingerprint:** MSVC 2022 v17.6, linker 14.36.35225. This is a
+  toolchain indicator the static analysis could not produce, and it may link
+  future samples to the same build environment.
+- Script host execution, consistent with the JScript modules
+
+### Added by dynamic analysis
+
+- **Windows Defender modification via PowerShell** (T1562.001) — not visible
+  in the static analysis
+- Kill-date check, locale query (geofencing), volume serial fingerprinting
+- Anomalous file deletion (10+), consistent with post-execution cleanup
+
+### Missed by dynamic analysis
+
+The Network, Dropped Files, Registry and Process Tree sections of the sandbox
+report were all **empty**. The report itself explains why: the sample
+*"exits too soon after checking local time"*. The payload never executed.
+
+Consequently none of the following appear in the sandbox report, all of which
+were recovered statically:
+
+- both `.onion` C2 addresses
+- the XOR key
+- the five wallet families and the 40k-address substitution pool
+- the XML-RPC multicall template and WordPress enumeration logic
+- the PowerShell screen-capture routine
+- the BIP-39 seed brute-force logic
+
+### Interpretation
+
+Several dynamic signatures read as shellcode — `Creates RWX memory`,
+`manually resolves API addresses from unbacked memory`, self-modifying code,
+VEH registration, guard pages. These are consistent with **PyArmor's runtime**,
+which was identified statically. Without that context an analyst would likely
+report them as process injection.
+
+Dynamic analysis reports what happened in one run. Static analysis reports
+what the sample can do. Against a sample with environmental checks, the former
+returns very little — and in this case returned almost nothing.
+
+Both were needed. The sandbox supplied the Defender tampering and the build
+fingerprint; static analysis supplied everything else, and supplied the context
+required to interpret the sandbox output correctly.
+
+---
+
+## 11. Assessment
+
+This is not a single malware family. It is a **modular platform** with independent monetisation paths sharing common infrastructure — bot identity, task queue, result store, Tor transport. The `pack.js` template with its `%D%`/`%P%` placeholders indicated a builder. Analysis of two further builds (§9) confirmed it: keys rotate every build, wallets and C2 rotate periodically, and the dropper is otherwise byte-identical.
 
 The operator's engineering is asymmetric. The evasion chain is genuinely layered — a recompiled bootloader is a deliberate, non-trivial step that most commodity droppers skip. Yet the payload encryption is repeating-XOR, chosen apparently on the assumption that PyArmor hides the key.
 
 PyArmor hides the key. It does not hide the **pattern** — and in a repeating-XOR construction the pattern *is* the key. Four layers of obfuscation fell to Hamming distance and byte frequency: techniques that predate the malware by roughly a century.
 
-The entire analysis was conducted statically, on an ARM host, without ever executing the sample.
+All three samples were analysed statically, on an ARM host, without ever executing them. The only dynamic data used came from a third-party sandbox run (§10), which the sample largely defeated.
 
 ---
 
-## 10. Methodology notes
+## 12. Methodology notes
 
 Static-only, on Apple Silicon (ARM64) — the x86 payload cannot execute on this host, which is itself a safety property.
 
@@ -453,5 +588,7 @@ Static-only, on Apple Silicon (ARM64) — the x86 payload cannot execute on this
 | `strings`, `xxd` | Triage |
 | Python | Frequency analysis, Hamming distance, key recovery, bulk decryption |
 | `yara` | Rule development and testing |
+| `shasum`, `diff` | Cross-build comparison |
+| CAPE Sandbox | Third-party dynamic analysis (build 2) |
 
 **Operational note.** Running Python from inside the extracted sample directory caused an import error: the interpreter resolved the sample's `struct.pyc` (Python 3.13 bytecode) instead of the standard library module. Harmless here, but the same mechanism is a code-execution vector in a Python-based sample. **Never execute an interpreter with a malware directory as the working directory.**
