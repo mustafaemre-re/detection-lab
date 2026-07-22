@@ -54,3 +54,6 @@ __pycache__/
 .vscode/
 .idea/
 *.swp
+
+# Analysis reports are the deliverable - never ignored
+!analysis/*.md
