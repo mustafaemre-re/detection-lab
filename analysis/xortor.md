@@ -366,6 +366,39 @@ The archive's string table nonetheless revealed its contents: `pyinstaller-6.20.
 
 ---
 
+## Campaign evolution
+
+A second build was analysed on 2026-07-22:
+`149ab46739ca442762502a69f0960365a7c5e7761c76f2e6c2997bd43744a62a`
+
+The dropper is byte-identical apart from its icon resource — every section
+matches in size and entropy except `.rsrc` (19,968 vs 18,432 bytes). Same
+bootloader, same 150 imports, different payload.
+
+| Element | Build 1 | Build 2 | Status |
+|---|---|---|---|
+| XOR key | `tgn5AIyxKkQi` | `9famr2xoY773` | **rotated** |
+| `002_b.js` (WordPress) | `c49dc645...` | `c49dc645...` | **identical** |
+| WordPress C2 | `sqwzutzq7b`+`3ad.onion/` | same | **static** |
+| BIP-39 list, 40k addresses | 15,162 / 1,519,563 | same sizes | **static** |
+| Clipper wallets | `jZh3AMaxrk`… | `12FfZsjyDr`, `bc1qz33n9x`, `rvCKiLmRnr`, `aACxfnXrKP` | **rotated** |
+| Clipper C2 | `ffeasxsfee`… | `http://hek`+`x47vp3k7pg`+`ffeasxsfee` | partially reused |
+| Gate path | — | `core/repla`+`.php` | present in both |
+| New behaviour | — | WMI `Terminate` against `wscript`/`cscript` | added |
+
+**Assessment.** The WordPress module is frozen; the clipper is where the
+operator invests. Wallets and the XOR key rotate per build, but the
+`ffeasxsfee` C2 fragment persists across both — infrastructure is only
+partially rotated.
+
+**Detection impact.** `XORTOR_Encrypted_Payload` failed against build 2, as
+predicted in §7.3. `XORTOR_XORed_PE_KeyAgnostic` was written in response and
+keys on PE header structure rather than key material; it matches both builds.
+The JScript and C2-fragment rules survived rotation because they key on
+function names and the reused `ffeasxsfee` fragment.
+
+---
+
 ## 9. Assessment
 
 This is not a single malware family. It is a **modular platform** with independent monetisation paths sharing common infrastructure — bot identity, task queue, result store, Tor transport. The `pack.js` template with its `%D%`/`%P%` placeholders confirms a builder, implying additional samples with different keys, different C2, and potentially different modules.
