@@ -2,9 +2,8 @@
 
 Malware analysis reports and the detection logic derived from them.
 
-Every rule in this repository traces back to a sample I took apart myself. Analysis first, detection second — a rule I cannot explain the origin of is a rule I do not ship.
-
 **Author:** Mustafa Emre
+
 **Focus:** Static malware analysis · detection engineering · threat intelligence
 
 ---
