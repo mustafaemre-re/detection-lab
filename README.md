@@ -24,6 +24,7 @@ scripts/      Analysis tooling
 | Report | Sample | Summary |
 |---|---|---|
 | [XORTOR](analysis/xortor.md) | `4487762...bc2fd4a` | Tor-based modular crimeware: WordPress brute-force botnet + crypto clipper. Four obfuscation layers stripped statically; 12-byte XOR key recovered through frequency analysis without key material. |
+| [SALAT](analysis/salat.md) | `1fce06b...9a66820` | Go infostealer targeting ~30 browsers, 16 wallets, Steam and messaging clients. Unpacked, but resolves C2 over DNS-over-HTTPS and transports over QUIC/HTTP3 — defeating DNS sinkholing and TLS inspection by design. Full capability set recovered from Go build metadata without disassembly. |
 
 ---
 
@@ -32,6 +33,7 @@ scripts/      Analysis tooling
 | Rule | Target | Report |
 |---|---|---|
 | [`xortor.yar`](yara/xortor.yar) | XORTOR — encrypted payload, dropper, JScript modules, C2 fragments, screen capture | [XORTOR](analysis/xortor.md) |
+| [`salat.yar`](yara/salat.yar) | SALAT — Go module path, dependency-intersection fingerprint, exact build ID | [SALAT](analysis/salat.md) |
 
 ---
 
