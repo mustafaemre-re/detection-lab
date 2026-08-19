@@ -37,6 +37,28 @@ scripts/      Analysis tooling
 | [`salat.yar`](yara/salat.yar) | SALAT — Go module path, dependency-intersection fingerprint, exact build ID | [SALAT](analysis/salat.md) |
 | [`polydrop.yar`](yara/polydrop.yar) | POLYDROP — crypter section geometry (string-free, structural), camouflage import set | [POLYDROP](analysis/polydrop.md) |
 
+### Behavioural (Sigma)
+
+| Rule | Target | Report |
+|---|---|---|
+| [`polydrop_fake_programdata_path.yml`](sigma/polydrop_fake_programdata_path.yml) | Execution and file creation under `%LOCALAPPDATA%\ProgramData\` — a directory Windows does not have | [POLYDROP](analysis/polydrop.md) |
+| [`polydrop_blockchain_deaddrop.yml`](sigma/polydrop_blockchain_deaddrop.yml) | Blockchain RPC lookups from non-browser processes; hijack of the Compatibility Appraiser task | [POLYDROP](analysis/polydrop.md) |
+
+`UserInitMprLogonScript` persistence is deliberately **not** duplicated here — it
+is already covered by *Potential Persistence Via Logon Scripts — Registry* (Tom
+Ueltschi) in the Sigma Integrated Rule Set.
+
+Mutex creation has no Sigma rule because Sysmon does not log it by default;
+`Global\85B6839F7FF0A23D` remains an IOC for memory and handle enumeration only.
+
+---
+
+## Tooling
+
+| Script | Purpose |
+|---|---|
+| [`polydrop_deaddrop_poll.py`](scripts/polydrop_deaddrop_poll.py) | Reads POLYDROP's C2 configuration from its Polygon dead-drop contract and reports when the operator rotates it. Read-only `eth_call` — no transaction, no trace, no sample needed. |
+
 ---
 
 ## How I work

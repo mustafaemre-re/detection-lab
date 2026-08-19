@@ -1,0 +1,96 @@
+title: Blockchain RPC Provider Contacted By Non-Browser Process
+id: 3c8d1f52-6a94-4b07-8e3d-5f2b0c7a9d64
+status: experimental
+description: |
+    Detects DNS lookups for public blockchain RPC providers from a process that
+    is not a browser or a known wallet application.
+
+    Malware uses public RPC endpoints to read C2 configuration from a smart
+    contract acting as a dead drop. The contract cannot be seized and the RPC
+    providers cannot be blocklisted without breaking legitimate services, so the
+    detection opportunity is the *caller*, not the destination.
+
+    POLYDROP queries three providers in failover order and issues an eth_call to
+    contract 0x0E04c59f31E382D2B8A1637f4B9A5f04165EC48d (selector 0x44574e9b)
+    whenever its primary WebSocket C2 is unreachable.
+
+    NOTE: the domains below are legitimate infrastructure. Do NOT blocklist them.
+    This rule is about which process is asking.
+references:
+    - https://github.com/mustafaemre-re/detection-lab/blob/main/analysis/polydrop.md
+author: Mustafa Emre
+date: 2026/08/19
+tags:
+    - attack.command-and-control
+    - attack.t1102
+    - attack.t1008
+logsource:
+    category: dns_query
+    product: windows
+detection:
+    selection_rpc:
+        QueryName:
+            - 'polygon.lava.build'
+            - 'polygon-mainnet.gateway.tatum.io'
+            - 'api.zan.top'
+            - 'gtm-rpc.zan.top'
+            - 'regional.blockchain.tatum.io'
+    filter_browsers:
+        Image|endswith:
+            - '\chrome.exe'
+            - '\firefox.exe'
+            - '\msedge.exe'
+            - '\brave.exe'
+            - '\opera.exe'
+            - '\vivaldi.exe'
+            - '\iexplore.exe'
+    condition: selection_rpc and not filter_browsers
+falsepositives:
+    - Cryptocurrency wallet software (Exodus, Trust Wallet, MetaMask desktop)
+    - Blockchain development tooling (Hardhat, Truffle, Foundry, node.exe)
+    - Any in-house application legitimately reading on-chain data
+    - Expect these to be common in a crypto-focused environment and rare to absent
+      in a general corporate estate. Tune the browser filter into an allowlist of
+      approved wallet binaries before deploying.
+level: medium
+---
+title: Modification Of Microsoft Compatibility Appraiser Scheduled Task
+id: 5a7e3b18-2f60-4c9d-a1b4-8d6f2e0c3475
+status: experimental
+description: |
+    Detects writes to the Microsoft Compatibility Appraiser scheduled task file.
+    Hijacking an existing Microsoft-named task is stealthier than creating a new
+    one, because responders and tooling that enumerate tasks by suspicious name
+    will not flag it.
+
+    This behaviour was NOT observed in the analysis referenced below - it is
+    reported by VirusTotal's public sandbox for the same hash and is recorded in
+    section 11.2 of that report. The rule is therefore written against
+    third-party observation and has not been validated against first-hand
+    telemetry.
+references:
+    - https://github.com/mustafaemre-re/detection-lab/blob/main/analysis/polydrop.md
+author: Mustafa Emre
+date: 2026/08/19
+tags:
+    - attack.persistence
+    - attack.t1053.005
+    - attack.defense-evasion
+    - attack.t1036
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection:
+        TargetFilename|contains: '\System32\Tasks\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser'
+    filter_legit:
+        Image|endswith:
+            - '\svchost.exe'
+            - '\TiWorker.exe'
+            - '\TrustedInstaller.exe'
+    condition: selection and not filter_legit
+falsepositives:
+    - Windows servicing and cumulative updates rewrite this task legitimately.
+      The filter covers the common service accounts but is not exhaustive - expect
+      tuning during patch windows.
+level: high

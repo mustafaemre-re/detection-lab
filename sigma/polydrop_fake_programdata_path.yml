@@ -1,0 +1,55 @@
+title: Execution From Fabricated AppData ProgramData Directory
+id: 7b1f4c9a-3d62-4e18-9a55-2c0e8f6d4a11
+status: experimental
+description: |
+    Detects process execution from a path containing '\AppData\Local\ProgramData\'.
+    This directory does not exist in Windows. The genuine ProgramData folder is
+    C:\ProgramData, at the drive root. A path combining the two is fabricated to
+    look plausible to a human reading a process list.
+    Observed in POLYDROP, which installs to
+    %LOCALAPPDATA%\ProgramData\Cache\2C196A50\SoftManager72fb40.exe
+references:
+    - https://github.com/mustafaemre-re/detection-lab/blob/main/analysis/polydrop.md
+author: Mustafa Emre
+date: 2026/08/19
+tags:
+    - attack.defense-evasion
+    - attack.t1036.005
+    - attack.execution
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|contains: '\AppData\Local\ProgramData\'
+    condition: selection
+falsepositives:
+    - Unknown at time of writing. Windows does not create this directory and no
+      legitimate software has been identified that does. Any application creating
+      it would be doing something unusual regardless.
+level: high
+---
+title: File Creation In Fabricated AppData ProgramData Directory
+id: 9e4a2b70-8c15-4d3f-b6e2-1a7c9d0f5e33
+status: experimental
+description: |
+    Companion to the process_creation rule above. Catches the drop before
+    execution, which gives earlier warning and also fires when the payload is
+    written but never runs.
+references:
+    - https://github.com/mustafaemre-re/detection-lab/blob/main/analysis/polydrop.md
+author: Mustafa Emre
+date: 2026/08/19
+tags:
+    - attack.defense-evasion
+    - attack.t1036.005
+logsource:
+    category: file_event
+    product: windows
+detection:
+    selection:
+        TargetFilename|contains: '\AppData\Local\ProgramData\'
+    condition: selection
+falsepositives:
+    - Unknown at time of writing. See note above.
+level: high
