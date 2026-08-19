@@ -35,7 +35,7 @@ scripts/      Analysis tooling
 |---|---|---|
 | [`xortor.yar`](yara/xortor.yar) | XORTOR — encrypted payload, dropper, JScript modules, C2 fragments, screen capture | [XORTOR](analysis/xortor.md) |
 | [`salat.yar`](yara/salat.yar) | SALAT — Go module path, dependency-intersection fingerprint, exact build ID | [SALAT](analysis/salat.md) |
-| — | POLYDROP — no static rule shipped; the packed sample has no stable feature to key on. Behavioural detections documented in the report. | [POLYDROP](analysis/polydrop.md) |
+| [`polydrop.yar`](yara/polydrop.yar) | POLYDROP — crypter section geometry (string-free, structural), camouflage import set | [POLYDROP](analysis/polydrop.md) |
 
 ---
 

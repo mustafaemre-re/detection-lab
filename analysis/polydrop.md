@@ -523,23 +523,65 @@ visible to any inspection point that can see the request.
 Do **not** blocklist `api.zan.top`, `polygon.lava.build` or
 `polygon-mainnet.gateway.tatum.io`. They are legitimate infrastructure.
 
-### 7.3 Static — limited
+### 7.3 Static (see `polydrop.yar`)
 
-No YARA rule is offered against the packed sample. The reason is stated plainly
-rather than worked around: **the packed file contains nothing stable to key
-on.** Section names are randomised per build, entropy is uniform, imports are
-generic, and there are no strings. A rule keyed on the current section names or
-the current file hash would fail on the next build, and shipping such a rule
-would create false confidence.
+| Rule | Keys on | Durability |
+|---|---|---|
+| `POLYDROP_Crypter_Structure` | PE section geometry and entropy | **High** — no strings, names or key material |
+| `POLYDROP_Import_Fingerprint` | The six-import camouflage set | Medium — dies if the set rotates |
 
-Rules against the **unpacked, in-memory** image are viable — `Global\`
-+ 16-hex mutex, the `UserInitMprLogonScript` string, and the User-Agent all
-appear there. Those are usable for memory scanning (`yara -p`) or EDR in-memory
-rules, and are **untested against a clean corpus at time of writing** (§8), so
-they are not published here.
+**Correction to an earlier assessment.** This section initially stated that no
+static rule was possible, on the grounds that "the packed file contains nothing
+stable to key on" and that section names are randomised per build. Both claims
+were wrong. The randomisation claim was an **assumption from a single sample**,
+never verified. And the conclusion did not follow: a rule does not have to key
+on names or strings — it can key on *structure*.
 
-This is a deliberate omission. Per this repository's standard, an untested rule
-is a hypothesis, not a detection.
+`POLYDROP_Crypter_Structure` does exactly that. The crypter's defining property
+is geometric: four or more sections declared with `VirtualSize > 0` and
+`SizeOfRawData == 0` — empty containers the stub unpacks into at runtime —
+alongside one section holding over 90% of the file at entropy above 7.8. No
+linker emits that shape. The rule contains no strings, no section names and no
+hashes, so the unresolved question about name randomisation cannot affect it.
+
+`POLYDROP_Import_Fingerprint` is more literal but earns its place through its
+**negative** clauses. Any binary that unpacks itself must call
+`GetProcAddress`, `VirtualAlloc` and `VirtualProtect`. This sample imports none
+of them while importing six unrelated, benign-looking functions. The absence is
+as diagnostic as the presence.
+
+A memory-scan rule for the unpacked implant is **not shipped**. The artefacts
+exist and are listed in §7.1, but the analysis VM was reverted before such a
+rule could be tested, and an untested rule is a hypothesis.
+
+**Implementation note.** YARA's lexer treats `/` as the start of a regular
+expression. Writing the size comparison as `filesize * 90 / 100` causes the
+parser to swallow the remainder of the file and report `unterminated regular
+expression` on a later, unrelated line. Written as
+`raw_data_size * 100 > filesize * 90` instead.
+
+### 7.4 False positive testing
+
+| Corpus | Files | `Crypter_Structure` | `Import_Fingerprint` |
+|---|---|---|---|
+| Sample (positive control) | 1 | **match** | **match** |
+| All `.exe`/`.dll` on REMnux | **6,977** | 1 hit (the sample) | 1 hit (the sample) |
+| — of which Wine PE64 binaries | **1,464** | no hits | no hits |
+
+The Wine subset is what makes this meaningful. `POLYDROP_Crypter_Structure`
+keys on PE geometry, so the risk it carries is firing on unusual-but-legitimate
+linker output. Wine ships 1,464 genuine, legitimately-linked Windows PE64
+binaries — precisely the corpus that would expose such a rule. It stayed
+silent.
+
+Scanning ELF binaries would have proved almost nothing here: the `MZ` guard
+rejects them before any structural logic executes. Corpus **relevance**
+decides the value of an FP test, not corpus size.
+
+**Not tested:** signed Microsoft system binaries from a real Windows
+installation. Wine's implementations are the closest available substitute on
+this platform but are not byte-identical to Microsoft's. Anyone deploying
+`POLYDROP_Crypter_Structure` broadly should scan a genuine `System32` first.
 
 ---
 
