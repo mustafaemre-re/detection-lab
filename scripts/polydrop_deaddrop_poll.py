@@ -31,6 +31,9 @@ Usage
     python3 polydrop_deaddrop_poll.py --watch 3600    # poll hourly, report changes
     python3 polydrop_deaddrop_poll.py --state s.json  # persist last value
 
+Status: syntax-checked by .github/workflows/validate-rules.yml; not run in CI
+        (needs network / a sample). Verify locally before relying on output.
+
 Author: Mustafa Emre
 Report: analysis/polydrop.md
 """

@@ -12,7 +12,7 @@ Malware analysis reports and the detection logic derived from them.
 
 ```
 analysis/     Full analysis reports, one per sample
-yara/         YARA rules, referenced back to their report
+yara/         YARA rules, referenced back to their report (see yara/README.md)
 sigma/        Behavioural detections
 scripts/      Analysis tooling
 ```

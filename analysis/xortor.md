@@ -3,6 +3,7 @@
 **Author:** Mustafa Emre
 **Date:** 2026-07-18 (analysis) · 2026-07-22 (campaign update)
 **TLP:** CLEAR
+**Reviewed:** 2026-08-19 · corrections marked inline · rule status in [README](../README.md#rule-status)
 
 **Samples analysed:**
 
