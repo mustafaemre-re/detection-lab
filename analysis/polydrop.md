@@ -220,7 +220,13 @@ C:\Users\<user>\AppData\Local\ProgramData\Cache\2C196A50\SoftManager72fb40.exe
 
 Note `AppData\Local\ProgramData`. **There is no such Windows folder.** Genuine
 ProgramData is `C:\ProgramData`. The path is fabricated to survive a casual
-glance. Both `2C196A50` and `72fb40` are randomised.
+glance.
+
+`2C196A50` and `72fb40` were assumed here to be randomised per infection.
+**They are not.** Both appear identically in third-party sandbox output from a
+different environment (§11.1), so they are hardcoded and the full path can be
+matched literally rather than by pattern. The assumption came from one
+observation of one infection; it was never tested.
 
 Persistence, recovered from wide strings in unpacked memory and then confirmed
 on the host:
@@ -236,6 +242,13 @@ user logon. It requires no administrative rights and appears in none of the
 four locations most responders check. In this analysis, `HKCU\...\Run`,
 `HKLM\...\Run`, the Startup folder and `schtasks` all returned empty before
 this value was found.
+
+> **This is not the only persistence mechanism.** A second one — hijacking an
+> existing Windows scheduled task — was **not** found by this analysis and is
+> documented in §11. The `schtasks` query above returned empty because it
+> filtered on the malware's name, and the hijacked task carries a legitimate
+> Microsoft name. Searching persistence by *name* rather than by *modification
+> time or content* is what caused the miss.
 
 ### 3.6 ntdll hook
 
@@ -396,7 +409,14 @@ Dropped copy — **identical hash**, self-copy not second stage:
 %LOCALAPPDATA%\ProgramData\Cache\2C196A50\SoftManager72fb40.exe
 ```
 
-Path pattern (hex components randomised per infection):
+Full path — **hardcoded, not randomised** (§11.1). Match literally:
+
+```
+%LOCALAPPDATA%\ProgramData\Cache\2C196A50\SoftManager72fb40.exe
+```
+
+The looser pattern below is retained only as a fallback in case a future build
+does rotate these values:
 
 ```
 %LOCALAPPDATA%\ProgramData\Cache\<8-hex>\SoftManager<6-hex>.exe
@@ -631,17 +651,24 @@ plaintext would permit **passive long-term monitoring of the operator's
 infrastructure** by polling the contract, with no further samples required.
 That is the highest-value unfinished work here.
 
-**The C2 session was never established.** The WebSocket handshake was never
-completed — the lab returned `200 OK` rather than `101 Switching Protocols`.
-Consequently **no tasking was observed**, and the implant's actual capabilities
-after connection are unknown. Everything in §4.3 is inferred from loaded
-modules, which shows what the implant *can* reach for, not what it does.
+**The C2 session was never established, and this was the analysis's central
+limitation.** The simulated internet returned `200 OK` to the WebSocket upgrade
+instead of `101 Switching Protocols`, so the handshake never completed, no
+tasking arrived, and the implant looped on retry for the entire observation
+period.
 
-Completing the handshake with a valid `Sec-WebSocket-Accept` is the second
-recommended step.
+The consequence was larger than first recorded here. **Most of the malware's
+behaviour lives behind that handshake** — process injection, certificate store
+tampering, scheduled-task hijacking and privilege escalation all occur after
+tasking and none of them were observed (§11). Everything in §4.3 is inferred
+from loaded modules, which shows what the implant *can* reach for, not what it
+does.
+
+Completing the handshake with a valid `Sec-WebSocket-Accept` is the single most
+valuable unfinished step, ahead of decrypting the contract payload.
 
 **No collection, credential access or exfiltration observed.** Absence of
-evidence only. The implant never received tasking.
+evidence only, and given the above, weak evidence of absence.
 
 **`mscoree.dll` was not seen executing.** CLR hosting is indicated by the
 string, not by observed behaviour.
@@ -746,3 +773,154 @@ lines of noise to 18 wide strings, every one of which was relevant.
 **Operational note — a 32 MB private region yielded nothing** because it was
 *reserved*, not committed: `Total WS` was 4 KB. Region size in a memory map is
 address space, not resident data. Check the working-set column before dumping.
+
+---
+
+## 11. Third-party reporting: VirusTotal
+
+**Everything in this section is VirusTotal's public analysis of the same hash,
+not a finding of this report.** It is recorded separately, and nothing from it
+has been moved into §3–§5, so the boundary between what was determined here and
+what was determined elsewhere stays visible.
+
+Source: VirusTotal public report for
+`14bb4c85a5412e44fff51890c095c15d285bcfe83e320ca202121ce66911a0d3`.
+Detection ratio **20/56**. Retrieved 2026-08-19. Sandbox output from CAPA, CAPE
+Sandbox, Dr.Web vxCube, VirusTotal Jujubox and VirusTotal Observer.
+
+The material difference between the two analyses is network access.
+VirusTotal's sandboxes had real internet, so the WebSocket upgrade to
+`/feed` returned **`101`** and the implant received tasking. The lab used here
+returned `200` and it never did (§8.2). Their post-tasking observations are
+therefore things this analysis structurally could not have seen.
+
+### 11.1 Confirmed independently
+
+Findings reached here and separately reproduced by VirusTotal:
+
+| Artefact | Status |
+|---|---|
+| Mutex `Global\85B6839F7FF0A23D` | exact match |
+| `HKCU\Environment\UserInitMprLogonScript` | registry set; Sigma *Potential Persistence Via Logon Scripts — Registry* fired |
+| Drop path `…\ProgramData\Cache\2C196A50\SoftManager72fb40.exe` | exact match |
+| WebSocket C2 at `metric.gardenpark.click/feed` | `GET … → 101` |
+| `api.zan.top`, `polygon.lava.build`, `polygon-mainnet.gateway.tatum.io` | all three |
+| ntdll hooking | MBC `Unhook APIs [F0004.003]` |
+| Single capability, Base64 | CAPA agrees |
+
+One detail worth extracting: the folder name **`2C196A50` is identical** in
+VirusTotal's sandbox and in this analysis. It was assumed here to be randomised
+per infection (§5). It is **hardcoded**, which makes it a stronger indicator
+than recorded — the path can be matched literally, not by pattern.
+
+### 11.2 Added — behaviour this analysis did not observe
+
+All of the following occur after C2 tasking and were therefore unreachable
+here.
+
+**A second persistence mechanism.** The implant writes to:
+
+```
+C:\Windows\System32\Tasks\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser
+```
+
+It **hijacks an existing legitimate Windows scheduled task** rather than
+creating its own. This corrects §3.5, which reported `UserInitMprLogonScript`
+as the only persistence found. The `schtasks` query used here filtered on the
+malware's name and the hijacked task carries a Microsoft name, so it could not
+have matched.
+
+**Trust store tampering.** Three root certificates deleted:
+
+```
+HKLM\...\SystemCertificates\AuthRoot\Certificates\A8985D3A65E5E5C4B2D7D66D40C6DD2FB19C5436
+                                                  B1BC968BD4F49D622AA89A81F2150152A41D829C
+                                                  CABD2A79A1076A31F21D253635CB039D4329A5E8
+```
+
+**Process injection.** MITRE T1055 ×2; Sigma *Uncommon Svchost Command Line
+Parameter* fired, indicating injection into `svchost.exe`.
+
+**Privilege escalation attempt.** `consent.exe` appears in the process list —
+the UAC elevation prompt.
+
+**Additional dropped files.** `DPAPI.DLL` and `ncrypt.dll` written alongside the
+implant in the drop folder — legitimate DLL names in an attacker-controlled
+directory, consistent with search-order hijacking.
+
+**Telemetry disabling:**
+
+```
+schtasks /delete /f /TN "Microsoft\Windows\Customer Experience Improvement Program\Uploader"
+```
+
+**Sinkhole check.** Reads `%WINDIR%\system32\drivers\etc\hosts`.
+
+**Randomly-named secondary executables**, copied, executed and deleted:
+
+```
+c:\lvbasx\bszee.exe
+c:\oqiaiyo\qtybgngw.exe
+```
+
+**Non-interactive PowerShell** spawned — Sigma *Non Interactive PowerShell
+Process Spawned* fired.
+
+### 11.3 Added — infrastructure
+
+**Domain registration:**
+
+```
+gardenpark.click    created 2026-08-11    registrar Dynadot, LLC
+```
+
+Registered **eight days** before this analysis. Fresh infrastructure, consistent
+with a design that treats the domain as disposable (§9).
+
+**C2 resolution** — behind Cloudflare:
+
+```
+172.67.201.199 · 188.114.96.0 · 188.114.97.0     (AS13335)
+```
+
+**JA3 TLS fingerprints:**
+
+```
+a0e9f5d64349fb13191bc781f81f42e1
+98eaec8c8ef8baab245d0b65f788be91
+cbcd1d81f242de31fd683d5acbc70dca
+```
+
+JA3 survives domain and IP rotation, making these more durable network
+indicators than anything in §5.
+
+**Emerging Threats IDS rules already fire** on the blockchain RPC lookups
+(`api.zan.top`, `polygon.lava.build`, `polygon-mainnet.gateway.tatum.io` in TLS
+SNI) and on `.top` DNS queries. These are informational rules, not malware
+detections — but they mean the RPC pattern is already visible to any sensor
+running the ET Open ruleset.
+
+### 11.4 Attribution — unchanged
+
+**20/56 detections, no family name.** All labels are generic or heuristic. The
+"no family attribution" position in §8 stands, now supported by a second
+source rather than only by absence of local evidence.
+
+### 11.5 What this comparison shows
+
+Static analysis produced almost nothing on this sample. Dynamic analysis in an
+isolated lab produced the C2, the dead drop, the persistence value, the mutex
+and the hook — a complete IOC set. Dynamic analysis **with real network access**
+produced a materially different picture again: injection, trust-store
+tampering, a second persistence mechanism and privilege escalation.
+
+The gap between the second and third of those is not a matter of tooling or
+skill. It is the direct consequence of denying the sample its C2. Isolation is
+non-negotiable for safety, and it has an analytical cost that should be stated
+rather than discovered later: **against a sample whose behaviour is delivered by
+tasking, an isolated lab observes the loader, not the malware.**
+
+A controlled-egress setup — real network, full logging, prior approval — would
+have closed that gap. Absent that, a public sandbox report is the cheapest way
+to find out what the isolated run could not see, and checking one *before*
+declaring an analysis complete is the practice this report failed to follow.
