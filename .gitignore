@@ -57,3 +57,46 @@ __pycache__/
 
 # Analysis reports are the deliverable - never ignored
 !analysis/*.md
+
+# Added 2026-08-19 - types the original list missed.
+# Decrypted JScript payloads (002_n.js, 002_b.js) are fully functional
+# crimeware source and passed straight through the previous filter, which
+# only covered *.js.enc.
+*.js
+*.jse
+*.vbe
+*.wsf
+*.wsh
+*.hta
+*.lnk
+*.ps1
+*.psm1
+*.bat
+*.cmd
+*.iso
+*.img
+*.vhd
+*.vhdx
+*.cab
+*.jar
+*.apk
+*.elf
+*.so
+*.dylib
+*.o
+*.sys
+*.ocx
+*.cpl
+*.doc*
+*.xls*
+*.ppt*
+*.pdf
+*.rtf
+*.one
+*.eml
+*.msg
+
+# Rules and tooling are the deliverable - never ignored
+!yara/*.yar
+!sigma/*.yml
+!scripts/*.py

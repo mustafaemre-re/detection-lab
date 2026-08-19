@@ -15,17 +15,42 @@
 Sections 2-8 describe build 1 in full. Section 9 covers what changes across
 all three builds.
 
+> ## Revision notice — 2026-08-19
+>
+> This report was reviewed externally and **several claims did not survive**.
+> All are corrected in place, marked *Correction — 2026-08-19*, with the
+> original text left visible so the change is auditable.
+>
+> | Claim | Status |
+> |---|---|
+> | §7.4 false-positive fix "applied and re-tested" | **Was never applied.** Rule corrected; CI added |
+> | `1988hhzEeH`, `12Qntcik` as `.onion` fragments | **Impossible** — fail RFC4648 base32. Reclassified |
+> | "BIP-39 seed brute-forcing" | **Arithmetically indefensible** (2¹²¹). Rewritten as harvesting |
+> | "Four obfuscation layers stripped" | **Two of four.** PyArmor and obfuscator.io were not |
+> | "New SHA-256 roughly hourly" | **n=2 on an attacker-writable field.** Downgraded to low confidence |
+> | "Byte-identical apart from icon" | **Contradicted in its own sentence** by three `.rsrc` sizes |
+> | Four ATT&CK technique IDs | **Wrong or unsupported.** Corrected or removed |
+> | `campus.py` "intentional corruption" | **Own pipeline not excluded** as the cause |
+>
+> The technical core holds. The XOR key recovery in §3.4–3.5 was independently
+> checked and is internally consistent: key, `$mz_enc` and ciphertext agree.
+>
+> **The C2 addresses were never recovered**, and that remains the largest gap —
+> §5 is honest about it while §1 and the README were not. Corrected.
+
 ---
 
 ## 1. Executive summary
 
-A PyInstaller-packaged dropper delivers a modular crimeware platform that turns the victim host into a worker node for two independent monetisation schemes: a **WordPress brute-force botnet** and a **cryptocurrency clipper with BIP-39 seed brute-forcing and screen capture**. All command-and-control traffic is tunnelled through a **bundled Tor client** to two distinct `.onion` services.
+A PyInstaller-packaged dropper delivers a modular crimeware platform that turns the victim host into a worker node for two independent monetisation schemes: a **WordPress brute-force botnet** and a **cryptocurrency clipper with BIP-39 seed-phrase harvesting and screen capture**. All command-and-control traffic is tunnelled through a **bundled Tor client** to two distinct `.onion` services.
 
-The sample stacks four layers of obfuscation — a recompiled PyInstaller bootloader, a PyArmor-protected loader, a 12-byte repeating-XOR payload set, and `obfuscator.io`-processed JScript. Despite this, the entire payload set was recovered **statically, without execution and without possession of the key**, through frequency analysis.
+The sample stacks four layers of obfuscation — a recompiled PyInstaller bootloader, a PyArmor-protected loader, a 12-byte repeating-XOR payload set, and `obfuscator.io`-processed JScript. **Two of the four were fully stripped**: the PyInstaller container was extracted, and the XOR payload set was decrypted **statically, without execution and without possession of the key**, through frequency analysis.
+
+The other two were not. `installer.pyc` remains PyArmor-protected and unread (§3.3), so the orchestrator — how modules are launched, how tasking flows, where persistence is established — is unknown. The `obfuscator.io` string array was never decoded, which is why **the C2 addresses were never reassembled** (§5): the fragments below are 10-character chunks, not addresses. *(Corrected 2026-08-19; this paragraph previously implied all four layers fell.)*
 
 The chain's critical weakness is its choice of repeating-XOR over authenticated encryption: the key leaks through the NUL-padded regions of the encrypted PE, making the payload detectable **on disk in its encrypted state** — and detectable without knowing the key at all.
 
-Two further builds were analysed. The dropper is byte-identical apart from its icon; the XOR key rotates every build while the payload does not. The builder's primary function is **hash rotation**, not payload development (§9). A sandbox run of build 2 returned almost nothing, because the sample checks its environment and exits (§10).
+Two further builds were analysed. The dropper is identical apart from its `.rsrc` section (three different sizes — see the wording correction in §9); the XOR key rotates every build while the payload does not. The builder's primary function is **hash rotation**, not payload development (§9). A sandbox run of build 2 returned almost nothing, because the sample checks its environment and exits (§10).
 
 ---
 
@@ -195,7 +220,7 @@ try { eval(_decryptContent(_base64Decode(_bdata), _passw)); } catch (e) {}
 - `GetUserAgent()` — randomised User-Agent generation across Chrome/Firefox/Opera/Safari with randomised version numbers
 - C2: `sqwzutzq7b` + `3ad.onion/`
 
-### 4.4 `002_n.js` — crypto clipper, seed brute-force, screen capture
+### 4.4 `002_n.js` — crypto clipper, seed-phrase harvesting, screen capture
 
 **Clipboard hijacking.** Five address families are maintained:
 
@@ -209,7 +234,33 @@ mony_addrs    // Monero
 
 with `LoadREPL()`, `replace`, and `idx_*` index objects. `002a.txt` (39,998 addresses) is the attacker-controlled substitution pool.
 
-**Seed brute-forcing.** `LoadBip39()` reads `002w.txt` — the canonical **BIP-39 English wordlist** (2048 words, beginning `abandon`, `ability`, `able`).
+**BIP-39 wordlist handling.** `LoadBip39()` reads `002w.txt` — the canonical
+**BIP-39 English wordlist** (2048 words, beginning `abandon`, `ability`,
+`able`).
+
+> **Correction — 2026-08-19.** This was previously written as *"seed
+> brute-forcing"*, and that claim propagated into the executive summary, the
+> ATT&CK table and the README. **It is arithmetically indefensible.** A 12-word
+> BIP-39 mnemonic has a search space of 2048¹¹ ≈ 2¹²¹ (the final word is
+> checksum-constrained). Brute-forcing that on a victim workstation, in JScript,
+> under Windows Script Host, is not slow — it is impossible by many orders of
+> magnitude.
+>
+> The evidence was only ever two things: a function named `LoadBip39()` and the
+> presence of the wordlist. Neither establishes brute-forcing. The far more
+> likely purpose is **recognition**: matching clipboard or screen text against
+> the wordlist to identify a seed phrase and exfiltrate it. That reading is
+> consistent with the clipboard monitoring, the screen capture and `LoadREPL()`
+> already documented here.
+>
+> So the underlying finding — **seed phrase harvesting** — is probably correct.
+> The mechanism was named wrongly, and the wrong name was carried into four
+> other places in this repository. **Not resolved by re-reading the code**: the
+> decompiled JScript around `LoadBip39` and `BIP39_PATH` has not been
+> re-examined. If it only ever calls `indexOf` against the list, harvesting is
+> confirmed. If it generates combinations — e.g. completing a partially
+> recovered phrase — then a bounded brute-force is plausible and the word count
+> assumed must be stated.
 
 **Screen capture** via hidden PowerShell:
 
@@ -262,10 +313,20 @@ array and concatenated at runtime. The fragments below are what was recovered;
 **none reassembles to a complete 56-character v3 onion address**, so treat
 these as partial indicators rather than resolvable hosts.
 
+> **Correction — 2026-08-19.** Two strings previously listed here as C2
+> fragments, `1988hhzEeH` and `12Qntcik`, **cannot be part of an onion
+> address**. A v3 address is RFC4648 base32 — only `a-z` and `2-7`. The first
+> contains `1`, `8` and `9`; the second contains `1`. Every other fragment
+> listed here validates against that alphabet, so a single check would have
+> caught it. Their real purpose is unknown; candidates include a bot
+> identifier, an auth token or a base64 fragment. Moved to
+> `XORTOR_Unclassified_Strings` in the ruleset and recorded below under
+> *Unclassified*.
+
 ```
 Module B (WordPress) - all three builds:
   sqwzutzq7b [...] 3ad.onion          (13 of 56 chars recovered)
-  additional fragments: yxoedle2gd, 1988hhzEeH, 12Qntcik, http://gfo
+  additional fragment:  yxoedle2gd
 
 Module N (clipper) - build 1:
   ffeasxsfee xev2rvxfiv i2wvkxre5v axkjeepxzx va4u4ydm2q ead.onion
@@ -274,6 +335,9 @@ Module N (clipper) - build 1:
 Module N (clipper) - builds 2 and 3:
   http://hek [...] x47vp3k7pg ffeasxsfee [...]
   gate path: core/repla[...].php
+
+Unclassified - recovered, purpose undetermined, NOT onion fragments:
+  1988hhzEeH   12Qntcik            (fail RFC4648 base32; see correction above)
 
 Local:
   127.0.0.1:9050                      (Tor SOCKS proxy)
@@ -347,18 +411,18 @@ hourly (§9). The decrypted payload hashes are stable and far more valuable.
 | Discovery | T1057 — Process Discovery | `psutil`, `_wmi.pyd`, WMI queries |
 | Collection | T1113 — Screen Capture | `CopyFromScreen` → `%TEMP%` |
 | Collection | T1115 — Clipboard Data | Five-family address substitution |
-| Credential Access | T1110.003 — Password Spraying | XML-RPC multicall, 40 threads |
+| Credential Access | T1110.001 — Password Guessing | XML-RPC multicall, 60 passwords per enumerated user. **Corrected 2026-08-19** from T1110.003 (Spraying): spraying is many accounts / few passwords; this enumerates users via `WPGetUsers` then tries `BRUTE_DPWD_COUNT`=60 each. Targets third parties, not the victim host. |
 | Command and Control | T1090.003 — Multi-hop Proxy | Bundled Tor, dual `.onion` C2 |
-| Command and Control | T1573 — Encrypted Channel | Tor + XOR-obfuscated config |
-| Resource Development | T1583.003 — Botnet | Distributed worker architecture |
-| Impact | T1657 — Financial Theft | Clipper + seed brute-force |
+| ~~T1573 — Encrypted Channel~~ | **Removed 2026-08-19.** Evidence was "Tor + XOR-obfuscated config". Tor is already counted under T1090.003, and an XOR-obfuscated config on disk is T1027, not an encrypted C2 channel. No independent evidence supported this row. |
+| Resource Development | T1584.005 — Compromise Infrastructure: Botnet | **Corrected 2026-08-19.** T1583.003 is Virtual Private Server, not Botnet — the ID was simply wrong. The operator builds a botnet from compromised hosts (T1584.005) rather than renting one (T1583.005). PRE-platform, adversary-side, inferred — not observable from a sample. |
+| Impact | T1657 — Financial Theft | Clipper + seed-phrase harvesting |
 
 Added from dynamic analysis (§10):
 
 | Tactic | Technique | Evidence |
 |---|---|---|
 | Defense Evasion | T1562.001 — Disable or Modify Tools | Windows Defender modification via PowerShell |
-| Defense Evasion | T1497 — Virtualization/Sandbox Evasion | Kill-date check; exits early after reading local time |
+| Defense Evasion | T1497.003 — Time Based Evasion | Kill-date check; exits early after reading local time. **Corrected 2026-08-19** from the parent T1497 — a time check has a specific sub-technique. |
 | Defense Evasion | T1070.004 — File Deletion | Anomalous deletion behaviour (10+ files) |
 | Discovery | T1614 — System Location Discovery | Locale query, consistent with geofencing |
 | Discovery | T1082 — System Information Discovery | Volume serial / hardware ID fingerprinting |
@@ -375,8 +439,9 @@ Added from dynamic analysis (§10):
 | `XORTOR_Encrypted_Payload` | Encrypted PE, build-1 key only | On-disk (superseded) |
 | `XORTOR_Dropper_PyInstaller_PyArmor` | Dropper | On-disk |
 | `XORTOR_JS_Modules_Decrypted` | JScript modules | Memory / post-decryption |
-| `XORTOR_C2_Onion_Fragments` | C2 fragments | Memory / post-decryption |
-| `XORTOR_Screenshot_Exfil` | PowerShell capture routine | Memory / post-decryption |
+| `XORTOR_C2_Onion_Fragments` | C2 fragments (base32-validated) | Memory / post-decryption |
+| `XORTOR_Unclassified_Strings` | Two strings previously mislabelled as C2 fragments; purpose unknown | Not for production |
+| `XORTOR_Screenshot_Capture` | PowerShell capture routine (renamed 2026-08-19 — capture to `%TEMP%` was evidenced, upload was not) | Memory / post-decryption |
 
 **The key insight behind `XORTOR_Encrypted_Payload`:** PE headers are NUL-heavy, and `NUL XOR key == key`. The key therefore appears **in cleartext inside the ciphertext**, at an arbitrary rotation. Matching all twelve rotations detects the payload on disk without decryption — the encryption defeats itself.
 
@@ -412,7 +477,7 @@ These survive rebuilds; the static indicators do not.
 
 ### 7.4 False positives observed and resolved
 
-`XORTOR_Screenshot_Exfil` initially matched `/Applications/Duolingo English Test.app/Contents/Resources/app.asar`.
+`XORTOR_Screenshot_Exfil` (now `XORTOR_Screenshot_Capture`) initially matched `/Applications/Duolingo English Test.app/Contents/Resources/app.asar`.
 
 **Root cause:** the rule keyed on generic PowerShell API strings (`Add-Type -`, `Windows.Fo`, `awing.Bitm`, `$bmp.Save(`). Legitimate applications capture screens. Within a multi-megabyte Electron bundle, four generic fragments co-occur by chance, and the `4 of ($ps*)` threshold was too permissive.
 
@@ -420,11 +485,79 @@ These survive rebuilds; the static indicators do not.
 
 **Re-test:** `002_n.js` still matches; the Duolingo bundle no longer does. No matches across `/usr/bin`.
 
+> ### Correction — 2026-08-19
+>
+> **The resolution described above was never applied to the shipped rule.** An
+> external review compared this section against `yara/xortor.yar` and found the
+> rule's condition was still:
+>
+> ```yara
+> condition:
+>     4 of ($ps*)
+>     or ($art and 2 of ($ps*))
+> ```
+>
+> No `filesize` bound. None of the six campaign anchors. And the second branch
+> was *looser* than the one blamed for the false positive. Reproduced: a
+> four-line benign PowerShell screenshot snippet matched it.
+>
+> This is worse than a defective rule. **The report asserted a verification that
+> did not happen**, which puts every other "verified", "confirmed" and
+> "re-tested" claim in this document in question — and there are several.
+>
+> Two further defects were found in the same review and are corrected in the
+> ruleset (see the revision header of `yara/xortor.yar`):
+>
+> - Four rules matched `xortor.yar` itself and three matched this report. Any
+>   MISP export or blog post quoting these IOCs would have alerted. All rules
+>   now carry file-type and size guards.
+> - `$o3b` and `$o3c` were labelled `.onion` C2 fragments. They cannot be — v3
+>   onion addresses are RFC4648 base32 (`a-z`, `2-7`) and these contain `1`,
+>   `8` and `9`. Verified programmatically; every other fragment validates.
+>   Moved to `XORTOR_Unclassified_Strings` and reclassified in §5.
+>
+> **The corrected rules have not been re-tested against the original samples**,
+> which were unavailable at revision time. The three changes are verifiable by
+> inspection and by the CI job that now scans this repository with its own
+> rules. Anyone holding the samples should re-run the positive controls.
+>
+> A CI workflow (`.github/workflows/validate-rules.yml`) now asserts that no
+> rule matches repository content. That single check would have failed on the
+> commit which introduced this discrepancy.
+
 ---
 
-## 8. Dead ends
+## 8. Dead ends and undetermined
 
 Recorded for completeness; negative results are results.
+
+### 8.0 Not determined — added 2026-08-19
+
+The original §8 covered only `campus.py`. External review noted that several
+questions an IR team asks first were **neither answered nor flagged as open**,
+which is worse than answering them badly. They are recorded here.
+
+**Persistence mechanism: unknown.** The ATT&CK table in §6 contains no
+Persistence row at all — not because none exists, but because none was found.
+For a report describing a long-running botnet worker, that is a conspicuous
+hole. Root cause: the orchestrator (`installer.pyc`) is PyArmor-protected and
+was never analysed (§3.3), so how modules are launched and where persistence is
+installed is simply unobserved.
+
+**Initial access vector: not investigated.** How the dropper reaches a victim —
+phishing, SEO poisoning, cracked-software bundling — was never examined. No
+delivery context was collected from MalwareBazaar.
+
+**Privilege escalation: not investigated.**
+
+**Exfiltration destination and volume: not characterised.** §4.5 shows the
+`curl --socks5` pattern; what is actually sent, and to which `.onion` path, was
+not determined because the C2 addresses were never reassembled.
+
+Closing these needs the orchestrator. Two viable routes: dump
+`pyarmor_runtime.pyd` at runtime on an x86 VM, or use the CAPE report's process
+tree, registry and autoruns diff (§10) — empty for build 2 because the sample
+exits on its kill-date check, but re-runnable with the date bypassed.
 
 **`campus.py` could not be extracted.** The file contains a single base64 blob decoding to UTF-8 mojibake with a visible RAR5 signature (`Rar!\x1a\x07\x01`). Character-by-character re-encoding through cp1252 with latin-1 fallback produced a 247,209-byte output — but the eighth byte was `0x20` instead of the required `0x00`, and 7-Zip rejected the archive.
 
@@ -438,10 +571,31 @@ LEN   : 247209
 
 **Zero NUL bytes in a 247 KB binary is statistically impossible.** Every NUL was lost in transit — partially converted to `0x20`, partially dropped. The data is irrecoverably lossy; no encoding recovers it.
 
-Two readings, unresolved:
+Three readings, unresolved:
 
 1. **Intentional corruption.** The blob may be designed to resist naive `base64.b64decode()` extraction, with the PyArmor-protected loader restoring NULs at runtime through a method not recoverable statically.
 2. **Transit damage.** The blob may have been corrupted through an encode/decode chain during packaging or distribution.
+3. **My own extraction was lossy.** — *added 2026-08-19, and the most likely of the three.*
+
+> **Correction — 2026-08-19.** The original text offered only readings 1 and 2
+> and drew an adversary capability from them: *"the PyArmor-protected loader
+> restoring NULs at runtime through a method not recoverable statically."*
+> **That inference is not supported.**
+>
+> The described method — *"character-by-character re-encoding through cp1252
+> with latin-1 fallback"* — means the base64 blob was handled as `str` at some
+> point. Reading binary data in text mode and re-encoding it destroys NUL bytes
+> and converts some to `0x20`. **That is precisely the signature observed:**
+> zero NULs in 247 KB, and 1,898 occurrences of `0x20`. The evidence fits a bug
+> in my own tooling at least as well as it fits attacker design, and the
+> "statistically impossible" framing concealed that a third explanation existed.
+>
+> Resolve it before claiming anything: read with `open(path, 'rb')`, extract the
+> base64 alphabet with a byte-level regex, and run
+> `base64.b64decode(data, validate=True)`. If NULs appear, delete readings 1 and
+> 2. If they do not, report the blob's exact file offset and first 64 bytes so
+> the claim rests on evidence rather than on an absence produced by my own
+> pipeline.
 
 The archive's string table nonetheless revealed its contents: `pyinstaller-6.20.0/bootloader/build/release/run.exe`, `runw.exe`, and the full set of `.o` build artefacts — **a recompiled PyInstaller bootloader**. Stock bootloader signatures are catalogued by every AV vendor; recompiling from source invalidates them. This finding survived the failed extraction and is arguably the more important one.
 
@@ -457,12 +611,33 @@ Three builds analysed:
 | 2 | `149ab46739ca442762502a69f0960365a7c5e7761c76f2e6c2997bd43744a62a` | `0x6a611c70` |
 | 3 | `78ef4cadec54dfda9055668975351cb20566d65be346536fa0f0eb7c8945203d` | `0x6a612aac` |
 
-Builds 2 and 3 were compiled **3,644 seconds apart — roughly one hour**.
-This is automated output, not hand-assembled samples.
+Builds 2 and 3 carry `TimeDateStamp` values **3,644 seconds apart — roughly one
+hour**.
 
-The dropper is byte-identical across all three except for its icon resource
-(`.rsrc`: 19,968 / 18,432 / 19,456). Every other section matches exactly in
-size and entropy; all three carry the same 150 imports.
+> **Correction — 2026-08-19.** This was previously presented as evidence of an
+> hourly build cadence and of "automated output". **Neither conclusion is
+> supported.** Three problems: (a) `n = 2`, and build 1's timestamp is absent
+> from the table with no explanation; (b) `TimeDateStamp` is attacker-writable,
+> and in PyInstaller output it reflects the *bootloader's* compile time, not
+> when the sample was packaged; (c) all three came from MalwareBazaar, so
+> upload timing is a biased sample of build timing.
+>
+> What can be said: **two builds carry timestamps one hour apart. The campaign's
+> build cadence is unknown (low confidence).** The downstream conclusion — that
+> hash-based detection is worthless here — is probably right, but it rests on
+> the payload being identical across builds (§9.2), not on this timing. To
+> establish cadence properly, collect `first_seen` across many samples from
+> MalwareBazaar/VT and report the distribution.
+
+The dropper is identical across all three **apart from its `.rsrc` section**
+(19,968 / 18,432 / 19,456 bytes). Every other section matches in size and
+entropy, and all three carry the same 150 imports.
+
+> **Wording correction — 2026-08-19.** "Byte-identical apart from its icon" was
+> wrong: three different `.rsrc` sizes are given in the same sentence, so the
+> files are demonstrably not byte-identical. The "same 150 imports" claim should
+> also be evidenced with an imphash rather than a count — 150 imports is not the
+> same as 150 *identical* imports.
 
 ### 9.1 What rotates, what does not
 
@@ -494,8 +669,11 @@ rotation.
 
 ### 9.3 Detection impact
 
-Hash-based detection is worthless against this campaign: a new SHA-256
-appears roughly hourly for identical malware.
+Hash-based detection is worthless against this campaign — not because of any
+measured cadence (see the correction in §9), but because **the decrypted payload
+set is byte-for-byte identical across builds while every dropper hash differs**
+(§9.2). Re-encrypting unchanged content under a fresh key produces a new
+SHA-256 for the same malware, at whatever rate the operator chooses.
 
 `XORTOR_Encrypted_Payload`, which keyed on the literal key string, failed
 against build 2 exactly as predicted in §7.3. `XORTOR_XORed_PE_KeyAgnostic`
@@ -544,7 +722,7 @@ were recovered statically:
 - the five wallet families and the 40k-address substitution pool
 - the XML-RPC multicall template and WordPress enumeration logic
 - the PowerShell screen-capture routine
-- the BIP-39 seed brute-force logic
+- the BIP-39 seed-phrase harvesting logic
 
 ### Interpretation
 
@@ -579,6 +757,30 @@ All three samples were analysed statically, on an ARM host, without ever executi
 ## 12. Methodology notes
 
 Static-only, on Apple Silicon (ARM64) — the x86 payload cannot execute on this host, which is itself a safety property.
+
+### Reproducibility — added 2026-08-19
+
+External review noted that this report's central claim — key recovery from
+ciphertext alone — was **not reproducible** as published: the Hamming distance
+scan appeared as four hand-picked rows from an unstated range, and the recovery
+code was a 15-line excerpt.
+
+[`scripts/xortor_xor_keyrecover.py`](../scripts/xortor_xor_keyrecover.py) now
+implements both steps end to end and prints the **full** scan rather than a
+selection:
+
+```
+python3 scripts/xortor_xor_keyrecover.py data_p002/uusd.exe
+python3 scripts/xortor_xor_keyrecover.py data_p002/uusd.exe --decrypt uusd_plain.exe
+```
+
+Expected on build 1: key length 12, key `tgn5AIyxKkQi`, plaintext beginning
+`4D 5A`.
+
+**Still not reproducible:** the tool table below carries no versions, and no
+exact invocations are recorded. The CAPE analysis referenced in §10 is cited by
+ID only — no URL, no exported JSON — so that third-party evidence cannot be
+independently checked either.
 
 | Tool | Use |
 |---|---|

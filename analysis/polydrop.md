@@ -10,10 +10,12 @@
 |---|---|
 | 1 | `14bb4c85a5412e44fff51890c095c15d285bcfe83e320ca202121ce66911a0d3` |
 
-Name assigned from the sample's defining characteristic: a **Poly**gon smart
-contract used as a C2 dead **drop**. The dropped filename (`SoftManager` + six
-random hex) is not stable enough to name a family. No public family name was
-matched at time of writing (§8).
+**POLYDROP is a local handle, not an attribution claim.** It is derived from
+the sample's defining characteristic — a **Poly**gon smart contract used as a
+C2 dead **drop** — and is used here only so the report has something to call
+the thing. **No attribution search was performed** (§8.2), so this family may
+already have a published name. Do not propagate the label until that is
+checked.
 
 ---
 
@@ -82,8 +84,10 @@ address space but containing no bytes on disk. They are empty containers the
 unpacking stub fills at runtime. All real content lives in `.hT:` at entropy
 7.95 (ceiling 8.0), which is the entire file.
 
-Section names `.*B{`, `.i:6`, `.hT:` are randomised per build. No compiler
-produces these.
+Section names `.*B{`, `.i:6`, `.hT:` contain punctuation no compiler emits.
+Whether they **rotate between builds is unknown** — only one sample was
+examined. No detection in this repository keys on them, so the question is open
+rather than load-bearing (§7.3).
 
 ### Imports
 
@@ -679,9 +683,25 @@ address, deployment date, and any transaction history for
 examined. This is a cheap and likely productive lead — the deployer address may
 link to other campaigns.
 
-**No family attribution.** No public reporting was matched at time of writing.
-The blockchain dead-drop pattern has been reported for other families, but no
-specific attribution is claimed.
+**Attribution was not investigated.** This is a gap in the work, not a
+conclusion about the malware.
+
+What was actually done: two automated retrievals failed (MalwareBazaar served a
+CAPTCHA, VirusTotal's page is client-rendered), and one VirusTotal report was
+read manually — 20/56, all generic labels, no family name (§11.4). MalwareBazaar
+carries no signature tag.
+
+What was **not** done: no vendor blog search, no Malpedia or ETDA lookup, no
+search on the distinctive artefacts (`SoftManager`, the hardcoded `2C196A50`
+path component, `gardenpark.click`, or the contract address), and no review of
+existing reporting on blockchain dead-drop tooling — a technique known to be
+documented for other families.
+
+An earlier version of this section stated "no public reporting was matched",
+which implies a search took place. It did not. **The family name POLYDROP was
+therefore assigned before establishing that the family is unnamed**, which risks
+adding a redundant label to the taxonomy. Treat the name as a local handle for
+this report, not as a claim of novelty, until the search above is performed.
 
 **Single sample.** No campaign evolution analysis is possible.
 

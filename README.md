@@ -23,7 +23,7 @@ scripts/      Analysis tooling
 
 | Report | Sample | Summary |
 |---|---|---|
-| [XORTOR](analysis/xortor.md) | `4487762...bc2fd4a` | Tor-based modular crimeware: WordPress brute-force botnet + crypto clipper. Four obfuscation layers stripped statically; 12-byte XOR key recovered through frequency analysis without key material. |
+| [XORTOR](analysis/xortor.md) | `4487762...bc2fd4a` | Tor-based modular crimeware: WordPress brute-force botnet + crypto clipper. 12-byte XOR key recovered through frequency analysis without key material. Two of four obfuscation layers fully stripped — PyArmor and the obfuscator.io string array were not, and the C2 addresses were never recovered. Report revised 2026-08-19 after external review; see its §7.4. |
 | [SALAT](analysis/salat.md) | `1fce06b...9a66820` | Go infostealer targeting ~30 browsers, 16 wallets, Steam and messaging clients. Unpacked, but resolves C2 over DNS-over-HTTPS and transports over QUIC/HTTP3 — defeating DNS sinkholing and TLS inspection by design. Full capability set recovered from Go build metadata without disassembly. |
 | [POLYDROP](analysis/polydrop.md) | `14bb4c8...6911a0d3` | Packed Windows implant with WebSocket C2 and a Polygon smart contract as fallback dead drop. Static analysis yielded nothing — full C2 infrastructure, persistence and contract address recovered dynamically against a simulated internet. Seizing the C2 domain does not disrupt the botnet. |
 
@@ -58,6 +58,7 @@ Mutex creation has no Sigma rule because Sysmon does not log it by default;
 | Script | Purpose |
 |---|---|
 | [`polydrop_deaddrop_poll.py`](scripts/polydrop_deaddrop_poll.py) | Reads POLYDROP's C2 configuration from its Polygon dead-drop contract and reports when the operator rotates it. Read-only `eth_call` — no transaction, no trace, no sample needed. |
+| [`xortor_xor_keyrecover.py`](scripts/xortor_xor_keyrecover.py) | Recovers a repeating-XOR key from ciphertext alone: Hamming-distance key length, then column frequency. Makes XORTOR §3.4–3.5 reproducible — it previously showed four hand-picked scan rows and a 15-line excerpt. |
 
 ---
 
@@ -70,6 +71,21 @@ Mutex creation has no Sigma rule because Sysmon does not log it by default;
 **Every rule declares its blind spots.** A rule shipped without a documented limitation is a rule nobody can reason about. Each one here carries its scope, its known false positives, and what defeats it.
 
 **Test for false positives before shipping.** A rule that has never been run against a clean corpus is a hypothesis, not a detection.
+
+**And when the repository fails its own standard, say so in the repository.** In August 2026 an external review found that `xortor.md` §7.4 described a false-positive fix that had never been applied to the shipped rule, and that the claim had survived four commits. Everything found is corrected in place and marked, with the original text left visible. CI now enforces what the paragraph above only asserted.
+
+---
+
+## Rule status
+
+| Ruleset | Compiled | FP-tested | Corpus |
+|---|---|---|---|
+| [`polydrop.yar`](yara/polydrop.yar) | ✅ | ✅ | 6,977 PE files, incl. 1,464 Wine PE64 |
+| [`salat.yar`](yara/salat.yar) | ✅ | ✅ | 2 Go Windows PE + 230,767 files |
+| [`xortor.yar`](yara/xortor.yar) | ✅ | ⚠️ **partial** | Revised 2026-08-19; **not re-tested against the original samples**, which were unavailable. Corrections are verifiable by inspection and by CI. |
+| [`sigma/`](sigma/) | ✅ syntax | ❌ **untested** | No telemetry corpus was available. Treat as `experimental`. |
+
+Untested content is labelled rather than omitted, and labelled here rather than only in a commit message.
 
 ---
 

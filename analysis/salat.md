@@ -11,7 +11,7 @@
 | 1 | `1fce06baa55f455053a1d5094513a1d509d14cc0270241d329d287feb9a66820` |
 
 Name assigned from the module path embedded in the Go build metadata (`path salat`).
-No public family name was matched at time of writing (§8).
+**No attribution search was performed** — see §13. Treat SALAT as a local handle, not a claim that the family is unnamed.
 
 ---
 
@@ -610,8 +610,10 @@ executing after ~20 minutes and was not waited out. Go binaries produce very
 large function counts and are known to be slow under capa. The MITRE mapping in
 §6 is derived from manual analysis and is **not** capa-corroborated.
 
-**No family attribution.** The module name `salat` matched no public Go module
-index and no known family name at time of writing. The feature set (broad
+**Attribution not investigated** *(reworded 2026-08-19 — previously "No family
+attribution", which implied a search took place).* The module name `salat`
+matched no public Go module index; **no vendor reporting, Malpedia, ETDA or
+MalwareBazaar tag review was performed** (§13). The feature set (broad
 Chromium fork list, wallet breadth, Steam and Telegram theft) is characteristic
 of commodity stealer-as-a-service, but no specific family is claimed. The string
 `dQw4w9WgXcQ` — the YouTube video ID for Rick Astley's "Never Gonna Give You
@@ -683,3 +685,28 @@ the URL ends at `name=` and `failed` begins the next entry. **Every string
 extracted from a Go binary must be treated as potentially truncated at both
 ends until confirmed against the code that references it.** This is the main
 reason no C2 fragment could be confidently assembled (§8).
+
+---
+
+## 13. References and attribution status
+
+Added 2026-08-19 after external review noted this report cited no external
+sources.
+
+**Attribution: not investigated.** No vendor reporting, Malpedia, ETDA or
+MalwareBazaar tag review was performed for this sample. The name SALAT is taken
+from the Go module path embedded in the binary (`path salat`) and is a **local
+handle, not a claim that the family is unnamed**. Anyone extending this work
+should search on the module path, the Go build ID, and the `ffeasxsfee`-style
+C2 fragments before propagating the label.
+
+**Sample source:** MalwareBazaar,
+`1fce06baa55f455053a1d5094513a1d509d14cc0270241d329d287feb9a66820`.
+
+**Third-party dependencies referenced in §3.3** are public Go modules and can be
+verified at `pkg.go.dev` using the versions and `h1:` hashes recorded there. The
+hashes are the module authors', not the malware's, and identify the exact
+upstream release linked into the binary.
+
+**Detection tooling:** `capa` 9.3.1, `yara` 4.5.0, `FLOSS`, `pefile` 2024.8.26,
+on REMnux v2026.30.6 (Ubuntu 24.04.3).

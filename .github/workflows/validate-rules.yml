@@ -1,0 +1,132 @@
+name: validate-rules
+
+# Exists because of a specific failure. analysis/xortor.md section 7.4 claimed a
+# false-positive fix had been applied and re-tested. It had not been applied at
+# all, and the claim survived four commits before an external review caught it.
+#
+# Job 3 below is the direct guard: rules must not match this repository's own
+# files. That single assertion would have failed on the commit that introduced
+# the discrepancy.
+
+on:
+  push:
+    paths: ['yara/**', 'sigma/**', 'scripts/**', '.github/workflows/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  yara:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install YARA
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq yara
+
+      - name: Compile every ruleset
+        run: |
+          fail=0
+          for f in yara/*.yar; do
+            echo "--- $f"
+            yarac "$f" /dev/null || fail=1
+          done
+          exit $fail
+
+      - name: Rules must not match this repository
+        # A rule matching its own .yar file, its report, or a TI feed quoting
+        # its IOCs will alert on every MISP export and every blog post.
+        run: |
+          fail=0
+          for f in yara/*.yar; do
+            hits=$(yara -w -r "$f" analysis/ yara/ sigma/ scripts/ README.md 2>/dev/null || true)
+            if [ -n "$hits" ]; then
+              echo "FAIL: $f matches repository content:"
+              echo "$hits"
+              fail=1
+            fi
+          done
+          [ $fail -eq 0 ] && echo "OK: no rule matches repository content"
+          exit $fail
+
+      - name: Rules must not match a clean PE corpus
+        # Wine ships genuine, legitimately-linked Windows PE binaries - the
+        # relevant control for structure-based rules. Scanning ELF proves little
+        # because the MZ guard rejects it before any logic runs.
+        run: |
+          sudo apt-get install -y -qq wine64 2>/dev/null || true
+          corpus=$(find /usr/lib/wine /opt/wine* -type f \( -name '*.exe' -o -name '*.dll' \) 2>/dev/null | head -2000)
+          count=$(echo "$corpus" | grep -c . || echo 0)
+          echo "corpus: $count PE files"
+          if [ "$count" -lt 50 ]; then
+            echo "WARNING: corpus too small to be meaningful - not asserting"
+            exit 0
+          fi
+          echo "$corpus" > /tmp/pelist.txt
+          fail=0
+          for f in yara/*.yar; do
+            hits=$(yara -w --scan-list "$f" /tmp/pelist.txt 2>/dev/null || true)
+            if [ -n "$hits" ]; then
+              echo "FAIL: $f false-positives on clean PE corpus:"
+              echo "$hits"
+              fail=1
+            fi
+          done
+          [ $fail -eq 0 ] && echo "OK: 0 hits across $count clean PE files"
+          exit $fail
+
+  sigma:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+
+      - name: Install validators
+        run: pip install --quiet pyyaml sigma-cli
+
+      - name: YAML must parse
+        run: |
+          python3 - <<'PY'
+          import glob, sys, yaml
+          bad = 0
+          for f in sorted(glob.glob('sigma/*.yml')):
+              try:
+                  docs = list(yaml.safe_load_all(open(f)))
+                  print(f"OK  {f}  ({len(docs)} rule(s))")
+              except Exception as e:
+                  print(f"FAIL {f}: {e}"); bad = 1
+          sys.exit(bad)
+          PY
+
+      - name: Sigma schema check
+        run: sigma check sigma/ || echo "NOTE: sigma-cli reported issues (non-blocking)"
+
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Scripts must compile
+        run: python3 -m compileall -q scripts/
+
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No samples committed
+        # The repository hosts analysis, never binaries.
+        run: |
+          bad=$(git ls-files | grep -iE '\.(exe|dll|bin|dat|zip|7z|rar|js|vbs|hta|scr|msi|jar|apk)$' || true)
+          if [ -n "$bad" ]; then echo "FAIL: sample-like files tracked:"; echo "$bad"; exit 1; fi
+          echo "OK: no sample-like files tracked"
+
+      - name: Every rule file has a report reference
+        run: |
+          fail=0
+          for f in yara/*.yar sigma/*.yml; do
+            grep -q 'analysis/' "$f" || { echo "FAIL: $f has no report reference"; fail=1; }
+          done
+          [ $fail -eq 0 ] && echo "OK: all rules reference a report"
+          exit $fail
