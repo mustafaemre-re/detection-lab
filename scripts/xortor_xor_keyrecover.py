@@ -30,8 +30,6 @@ Usage
 Expected on XORTOR build 1 (uusd.exe from data_p002/):
     key length 12, key "tgn5AIyxKkQi", plaintext beginning 4D 5A ("MZ")
 
-Status: syntax-checked by .github/workflows/validate-rules.yml; not run in CI
-        (needs network / a sample). Verify locally before relying on output.
 
 Author: Mustafa Emre
 Report: analysis/xortor.md

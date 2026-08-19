@@ -9,7 +9,6 @@ description: |
     Observed in POLYDROP, which installs to
     %LOCALAPPDATA%\ProgramData\Cache\2C196A50\SoftManager72fb40.exe
 references:
-    - .github/workflows/validate-rules.yml (syntax only; NOT tested against telemetry)
     - https://github.com/mustafaemre-re/detection-lab/blob/main/analysis/polydrop.md
 author: Mustafa Emre
 date: 2026/08/19

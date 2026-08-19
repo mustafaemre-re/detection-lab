@@ -24,7 +24,7 @@ all three builds.
 >
 > | Claim | Status |
 > |---|---|
-> | §7.4 false-positive fix "applied and re-tested" | **Was never applied.** Rule corrected; CI added |
+> | §7.4 false-positive fix "applied and re-tested" | **Was never applied.** Rule corrected |
 > | `1988hhzEeH`, `12Qntcik` as `.onion` fragments | **Impossible** — fail RFC4648 base32. Reclassified |
 > | "BIP-39 seed brute-forcing" | **Arithmetically indefensible** (2¹²¹). Rewritten as harvesting |
 > | "Four obfuscation layers stripped" | **Two of four.** PyArmor and obfuscator.io were not |
@@ -519,12 +519,8 @@ These survive rebuilds; the static indicators do not.
 >
 > **The corrected rules have not been re-tested against the original samples**,
 > which were unavailable at revision time. The three changes are verifiable by
-> inspection and by the CI job that now scans this repository with its own
-> rules. Anyone holding the samples should re-run the positive controls.
->
-> A CI workflow (`.github/workflows/validate-rules.yml`) now asserts that no
-> rule matches repository content. That single check would have failed on the
-> commit which introduced this discrepancy.
+> inspection. Anyone holding the samples should re-run the positive controls.
+
 
 ---
 

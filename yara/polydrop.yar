@@ -22,7 +22,6 @@
     would use are documented in section 7.1 of the report.
 */
 
-// Validated by .github/workflows/validate-rules.yml on every push.
 import "pe"
 import "math"
 

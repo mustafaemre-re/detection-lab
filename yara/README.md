@@ -24,14 +24,3 @@ reasoned about.
 Add `tested` when a false-positive run has been done, with the corpus size.
 Add `status = "deprecated"` and `superseded_by` rather than deleting a rule.
 
-## Before committing
-
-CI (`.github/workflows/validate-rules.yml`) enforces:
-
-- every rule compiles
-- no rule matches this repository's own files
-- no rule matches a clean Windows PE corpus
-- every rule references a report
-
-The second check exists because rules here once matched their own `.yar` file
-and their own report, which would alert on any TI feed quoting the IOCs.

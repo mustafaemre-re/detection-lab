@@ -17,7 +17,6 @@ description: |
     NOTE: the domains below are legitimate infrastructure. Do NOT blocklist them.
     This rule is about which process is asking.
 references:
-    - .github/workflows/validate-rules.yml (syntax only; NOT tested against telemetry)
     - https://github.com/mustafaemre-re/detection-lab/blob/main/analysis/polydrop.md
 author: Mustafa Emre
 date: 2026/08/19

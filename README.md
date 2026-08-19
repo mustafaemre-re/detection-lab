@@ -72,7 +72,6 @@ Mutex creation has no Sigma rule because Sysmon does not log it by default;
 
 **Test for false positives before shipping.** A rule that has never been run against a clean corpus is a hypothesis, not a detection.
 
-**And when the repository fails its own standard, say so in the repository.** In August 2026 an external review found that `xortor.md` §7.4 described a false-positive fix that had never been applied to the shipped rule, and that the claim had survived four commits. Everything found is corrected in place and marked, with the original text left visible. CI now enforces what the paragraph above only asserted.
 
 ---
 
