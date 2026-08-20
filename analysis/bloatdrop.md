@@ -387,10 +387,20 @@ because it costs nothing and works today, not because it will last.
 
 The configuration is encrypted on disk and present in memory only after
 decryption. `BLOATDROP_Runtime_Config` and `BLOATDROP_Sandbox_Gate` are
-therefore **memory-scoped rules** and should not be expected to fire on a file
-at rest. Whether any of these strings also exist in plaintext in the binary was
-**not tested** — the sample was not reachable from the host at the time of
-writing — and the rules are marked accordingly.
+therefore **memory-scoped rules**.
+
+That scoping was an assumption when the rules were written. It is now a
+finding. Both rules were run against `sample.exe` on disk — the file clears
+their size floor, so both were genuinely evaluated — and **neither matched**.
+No dead-drop URL, no mutex string, no sandbox-check label and no Russian
+string survives in plaintext in the binary. **The string encryption is
+complete**, which §3.1 inferred from `floss` returning nothing and this
+confirms directly.
+
+The rules remain unproven in the direction that matters: neither has been run
+against a memory dump of a live infection, because the analysis VMs were
+reverted. A rule verified only by its failure to match the wrong target is a
+rule that compiles, not a rule that works.
 
 ### 7.3 Social platforms contacted by a non-browser process
 
@@ -420,12 +430,33 @@ observation.
 
 ### 7.6 Rule status
 
-**Nothing in this ruleset has been false-positive tested.** The sample and the
-clean corpus live inside the analysis VMs and were not reachable from the host
-when the rules were written. They are written to compile; they have not been
-compiled or run against a corpus. See the
-[rule status table](../README.md#rule-status). Test command in
-[`yara/README.md`](../yara/README.md).
+Tested 2026-08-21 on REMnux. All three rules compile.
+
+| Rule | Result |
+|---|---|
+| `BLOATDROP_Padded_Go_Loader` | 1 hit on the sample. **0 hits across 74,318 files** in `/usr/bin`, `/usr/lib` and `~/.wine`. Also matches the console-patched copy, as its `limitation` field states it would. |
+| `BLOATDROP_Runtime_Config` | Correctly negative against the sample on disk (§7.2). Untested against memory. |
+| `BLOATDROP_Sandbox_Gate` | Correctly negative against the sample on disk (§7.2). Untested against memory. |
+
+**The corpus number is misleading and should not be quoted without its
+denominator.** The rule requires `filesize > 50MB`. Only **14** of those 74,318
+files cleared that floor, so the candidate set was 14 — the other 74,304 were
+rejected on size before any logic ran. Zero false positives across 14 candidates
+is a weak result. It is reported here because it is the result that was
+obtained, not because it is sufficient.
+
+The population that would actually generate false positives — large Go PE64
+binaries carrying self-extracting archive overlays — was **not represented in
+that corpus at all**. A meaningful test needs a corpus of large Go Windows
+binaries, and that has not been assembled.
+
+One control was run and it is the one that matters. Appending a single byte to
+the sample moves the overlay to 88,080,385 bytes, no longer a whole number of
+mebibytes, and **the rule stops matching**. That confirms the round-mebibyte
+check in §7.1 is what carries the rule, rather than the rule passing on size and
+entropy alone.
+
+See the [rule status table](../README.md#rule-status).
 
 ---
 

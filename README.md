@@ -90,7 +90,7 @@ it too.
 |---|---|---|---|
 | [`polydrop.yar`](yara/polydrop.yar) | ✅ | ✅ | 6,977 PE files, incl. 1,464 Wine PE64 |
 | [`salat.yar`](yara/salat.yar) | ✅ | ✅ | 2 Go Windows PE + 230,767 files |
-| [`bloatdrop.yar`](yara/bloatdrop.yar) | ❌ **not compiled** | ❌ **untested** | Written while the sample and the clean corpus were inside the analysis VMs and unreachable from the host. Treat as a hypothesis. |
+| [`bloatdrop.yar`](yara/bloatdrop.yar) | ✅ | ⚠️ **partial** | 74,318 files, 0 hits — but only **14** cleared the rule's 50 MB floor, so the candidate set was 14. Large Go PE64 binaries with archive overlays, the population that would actually produce false positives, were absent from the corpus. The two memory-scoped rules are correctly negative on disk but untested against memory. |
 | [`xortor.yar`](yara/xortor.yar) | ✅ | ⚠️ **partial** | Revised 2026-08-19; **not re-tested against the original samples**, which were unavailable. Corrections are verifiable by inspection. |
 | [`sigma/`](sigma/) | ⚠️ **partial** | ❌ **untested** | No telemetry corpus was available. The POLYDROP rules were syntax-checked; the BLOATDROP pair was not. Treat all as `experimental`. |
 

@@ -4,10 +4,15 @@
     Author: Mustafa Emre
     Date:   2026-08-21
 
-    THREE RULES, NONE FALSE-POSITIVE TESTED. See analysis/bloatdrop.md section
-    7.6. The sample and the clean corpus live inside the analysis VMs and were
-    not reachable from the host when these were written. Treat every rule here
-    as a hypothesis until it has been run against a corpus.
+    THREE RULES. Compiled and tested 2026-08-21 on REMnux; results in each
+    rule's `tested` meta and in analysis/bloatdrop.md section 7.6.
+
+    READ THE CORPUS CAVEAT BEFORE TRUSTING THE ON-DISK RULE. The sweep covered
+    74,318 files, but only 14 of them cleared the rule's own 50 MB floor, so
+    only 14 were ever candidates. Zero hits across 14 candidates is a weak
+    result, not a strong one, and the population that would actually generate
+    false positives - large Go PE64 binaries carrying self-extracting archive
+    overlays - was not represented in that corpus at all.
 
       BLOATDROP_Padded_Go_Loader  - ON DISK. Structural: a Go PE64 whose overlay
                                     is an exact multiple of 1 MiB, occupies more
@@ -27,13 +32,20 @@
     line changed by the actor - pad to a random length - defeats it completely.
     Shipped because it costs nothing and works today, not because it will last.
 
-    WHY THE TWO MEMORY RULES MAY NOT WORK AT ALL: whether any of these strings
-    also exist in plaintext in the file on disk was NOT tested. They are written
-    against console output observed at runtime, not against a disassembly of the
-    format strings that produced it, so the exact string boundaries are inferred.
-    If the loader builds these messages with printf-style formatting, the
-    literals in the binary will be shorter than the lines below and some atoms
-    will never match.
+    THE TWO MEMORY RULES ARE CONFIRMED MEMORY-ONLY. Both were evaluated against
+    sample.exe on disk - it clears their filesize floor - and neither matched.
+    None of the dead-drop URLs, the mutex, the sandbox-check labels or the
+    Russian string exist in plaintext in the file. The string encryption is
+    complete, which is a first-hand confirmation rather than the assumption it
+    was when these rules were written.
+
+    They are still unproven in the direction that matters: neither has been run
+    against a memory dump of a live infection, because the analysis VMs were
+    reverted. They are written against console output observed at runtime, not
+    against a disassembly of the format strings that produced it, so the exact
+    string boundaries are inferred. If the loader builds these messages with
+    printf-style formatting, the literals in memory will be shorter than the
+    lines below and some atoms will never match.
 
     NOT SHIPPED, deliberately (report section 7.5): no rule on the Go module
     path yNjFRWkjrSgSHsEYcCU (randomised per build), none on 62.238.107.2 (one
@@ -55,10 +67,10 @@ rule BLOATDROP_Padded_Go_Loader
         hash         = "c9082f765b9d6580d20d56814b1edca52502b754e3553fae7387584f3c32d37c"
         scope        = "On-disk"
         confidence   = "medium"
-        tested       = "NO - not compiled against a corpus, not FP-tested"
+        tested       = "2026-08-21: 1 hit on the sample. 0 hits across 74,318 files in /usr/bin, /usr/lib and ~/.wine - but only 14 of those cleared the 50 MB floor, so the candidate set was 14, not 74,318. Verified negative on the sample with one byte appended, which confirms the round-mebibyte discriminator is what carries the rule."
         attack       = "T1027.001"
         note         = "The discriminator is exactness. Legitimate Go self-extracting installers also carry large high-entropy overlays, but a compressed archive appended to a stub does not land on a round mebibyte. 88,080,384 = 84 * 1,048,576 exactly."
-        limitation   = "Fragile by construction - a randomised pad length defeats it. Also matches the console-subsystem copy produced during analysis, since the subsystem patch does not touch the overlay."
+        limitation   = "Fragile by construction - a randomised pad length defeats it. Also matches the console-subsystem copy produced during analysis (confirmed 2026-08-21), since the subsystem patch does not touch the overlay."
 
     strings:
         // Go buildinfo magic: "\xff Go buildinf:" - survives -trimpath
@@ -105,7 +117,7 @@ rule BLOATDROP_Runtime_Config
         hash         = "c9082f765b9d6580d20d56814b1edca52502b754e3553fae7387584f3c32d37c"
         scope        = "Memory dumps only - NOT files at rest"
         confidence   = "medium"
-        tested       = "NO - not compiled against a corpus, not FP-tested"
+        tested       = "2026-08-21: compiles. Correctly did NOT match sample.exe on disk, confirming no config string survives in plaintext. NOT tested against a memory dump - no live infection was available, so the rule is unproven in the only scope it targets."
         attack       = "T1102.001"
         note         = "Campaign-level, not family-level. Every atom here is operator-controlled: the profiles, the handle m1duus and the codeword x4tte can all be changed without rebuilding the loader. Expect this rule to go stale."
         limitation   = "The codeword x4tte is 5 characters and is never sufficient alone - it is scored, not required. The mutex string is taken from third-party sandbox reporting (report section 11.2), not from first-hand observation."
@@ -169,7 +181,7 @@ rule BLOATDROP_Sandbox_Gate
         hash         = "c9082f765b9d6580d20d56814b1edca52502b754e3553fae7387584f3c32d37c"
         scope        = "Memory dumps only - NOT files at rest"
         confidence   = "low"
-        tested       = "NO - not compiled against a corpus, not FP-tested"
+        tested       = "2026-08-21: compiles. Correctly did NOT match sample.exe on disk, confirming the check labels are encrypted like the rest of the string table. NOT tested against a memory dump - no live infection was available."
         attack       = "T1497.001, T1497.003, T1622"
         note         = "The gate needs 8 of 13 checks to pass, so it is deliberately tolerant of a single tell (report section 3.5). These labels are the loader's own, not a public library's."
         limitation   = "Lowest-confidence rule in this file. Individual tokens such as peb_flags and av_sandbox appear in legitimate anti-analysis research tooling, sandbox-detection test harnesses and security blog corpora. Four are required precisely because no two are meaningful together. Verify a hit against the C2 artefacts in BLOATDROP_Runtime_Config before acting on it."
