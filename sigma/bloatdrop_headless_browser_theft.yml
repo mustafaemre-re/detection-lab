@@ -1,0 +1,70 @@
+title: Headless Browser Launched With Throwaway Profile And Logging Suppressed
+id: 9f2c6d41-83b7-4e50-9a16-7c4e0b8d3f29
+status: experimental
+description: |
+    Detects a Chromium or Firefox browser started in headless mode against a
+    freshly created, empty user-data directory, with its own logging disabled
+    and no page to load.
+
+    This is the shape of an App-Bound Encryption bypass. Chrome 127 and later
+    bind the cookie encryption key to the browser's identity, so code running
+    outside the browser process cannot decrypt Login Data or Cookies. Spawning a
+    clean headless instance supplies a legitimate, injectable browser process;
+    code injected into it - by APC in the referenced sample - then reads the
+    REAL profile with the browser's own decryption authority.
+
+    The throwaway profile is an injection host, not a data source. That is why
+    it is empty, points at about:blank, and is deleted immediately afterwards.
+
+    BLOATDROP spawns msedge.exe, chrome.exe and firefox.exe this way against
+    %LOCALAPPDATA%\tasSnc\<8 hex chars>, then removes each directory with
+    rmdir /s /q.
+
+    NOTE ON PROVENANCE: this behaviour was NOT observed in the analysis
+    referenced below. It is reported by VirusTotal's public sandbox for the same
+    hash and is recorded in section 11.2 of that report. The rule is therefore
+    written against third-party observation and has not been validated against
+    first-hand telemetry.
+references:
+    - https://github.com/mustafaemre-re/detection-lab/blob/main/analysis/bloatdrop.md
+author: Mustafa Emre
+date: 2026/08/21
+tags:
+    - attack.credential-access
+    - attack.t1555.003
+    - attack.t1539
+    - attack.defense-evasion
+    - attack.t1055
+    - attack.t1055.004
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_browser:
+        Image|endswith:
+            - '\chrome.exe'
+            - '\msedge.exe'
+            - '\firefox.exe'
+            - '\brave.exe'
+            - '\opera.exe'
+            - '\vivaldi.exe'
+    selection_headless:
+        CommandLine|contains|all:
+            - '--headless'
+            - '--user-data-dir='
+            - '--disable-logging'
+    selection_blank:
+        CommandLine|contains: 'about:blank'
+    condition: selection_browser and selection_headless and selection_blank
+falsepositives:
+    - Browser automation frameworks. Puppeteer, Playwright and Selenium all
+      launch headless browsers against a temporary user-data directory, and any
+      of them may load about:blank. The discriminator relied on here is
+      --disable-logging, which the mainstream frameworks do not pass by default -
+      that is a weak discriminator and it will not hold everywhere.
+    - CI runners, screenshot services, PDF renderers and link-preview generators.
+    - Baseline before deploying. In an estate with no web automation this should
+      be silent; in an engineering estate it will not be, and the rule should be
+      narrowed by parent process - a browser spawned by a non-browser, non-node,
+      non-python parent is the part that actually matters.
+level: high

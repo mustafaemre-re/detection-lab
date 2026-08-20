@@ -1,0 +1,79 @@
+title: Social Media Dead Drop Resolver Contacted By Non-Browser Process
+id: 4b7a0e93-1d68-42fc-b5a0-6e93c2f81704
+status: experimental
+description: |
+    Detects DNS lookups for Telegram, Pinterest and Steam from a process that is
+    not a browser, a messaging client or a game launcher.
+
+    Malware uses public social-media profiles as dead drops: the operator posts
+    the current C2 address on a profile they control, marked by a codeword, and
+    the implant fetches the profile and extracts the address. The profiles
+    cannot be seized, and the platforms cannot be blocklisted in any normal
+    environment - which is why they were chosen. The detection opportunity is
+    the CALLER, not the destination.
+
+    BLOATDROP tries a hardcoded IP first, then walks telegram.me/m1duus,
+    www.pinterest.com/m1duus and steamcommunity.com/profiles/76561198657426610
+    in fixed order, searching each page for the codeword x4tte. It repeats the
+    cycle up to 473 times.
+
+    NOTE: the domains below are legitimate consumer platforms. Do NOT blocklist
+    them. This rule is about which process is asking.
+
+    THE COMBINATION IS THE SIGNAL. Any one of these three resolved by an odd
+    process is weak evidence. All three resolved by the same non-browser process
+    inside a few seconds is the dead-drop walk. Sigma cannot express that
+    sequencing in a single detection block, so this rule fires per-lookup and is
+    expected to be paired with a correlation or aggregation at the SIEM: alert
+    on a distinct-count of 3 QueryName values per Image per minute, and treat
+    single hits as informational only.
+references:
+    - https://github.com/mustafaemre-re/detection-lab/blob/main/analysis/bloatdrop.md
+author: Mustafa Emre
+date: 2026/08/21
+tags:
+    - attack.command-and-control
+    - attack.t1102.001
+    - attack.t1008
+    - attack.t1071.001
+logsource:
+    category: dns_query
+    product: windows
+detection:
+    selection_platforms:
+        QueryName:
+            - 'telegram.me'
+            - 't.me'
+            - 'www.pinterest.com'
+            - 'pinterest.com'
+            - 'steamcommunity.com'
+    filter_browsers:
+        Image|endswith:
+            - '\chrome.exe'
+            - '\firefox.exe'
+            - '\msedge.exe'
+            - '\brave.exe'
+            - '\opera.exe'
+            - '\vivaldi.exe'
+            - '\iexplore.exe'
+    filter_clients:
+        Image|endswith:
+            - '\Telegram.exe'
+            - '\steam.exe'
+            - '\steamwebhelper.exe'
+            - '\GameOverlayUI.exe'
+            - '\Discord.exe'
+    condition: selection_platforms and not 1 of filter_*
+falsepositives:
+    - Any application with an embedded browser control or a social share feature.
+      Electron applications are a large source of this - they resolve consumer
+      domains from a binary that is not on the browser list.
+    - Game launchers and overlays other than Steam's, and modding or inventory
+      tools that query steamcommunity.com legitimately.
+    - Link-preview generation in chat and mail clients.
+    - Corporate marketing and social-media management tooling querying Pinterest.
+    - Expect this rule to be noisy as written. It is worth deploying only with
+      the distinct-count correlation described above, and after the two filter
+      lists have been extended into an allowlist of software actually present in
+      the estate.
+level: medium

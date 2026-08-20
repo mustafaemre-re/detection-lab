@@ -26,6 +26,7 @@ scripts/      Analysis tooling
 | [XORTOR](analysis/xortor.md) | `4487762...bc2fd4a` | Tor-based modular crimeware: WordPress brute-force botnet + crypto clipper. 12-byte XOR key recovered through frequency analysis without key material. Two of four obfuscation layers fully stripped — PyArmor and the obfuscator.io string array were not, and the C2 addresses were never recovered. Report revised 2026-08-19 after external review; see its §7.4. |
 | [SALAT](analysis/salat.md) | `1fce06b...9a66820` | Go infostealer targeting ~30 browsers, 16 wallets, Steam and messaging clients. Unpacked, but resolves C2 over DNS-over-HTTPS and transports over QUIC/HTTP3 — defeating DNS sinkholing and TLS inspection by design. Full capability set recovered from Go build metadata without disassembly. |
 | [POLYDROP](analysis/polydrop.md) | `14bb4c8...6911a0d3` | Packed Windows implant with WebSocket C2 and a Polygon smart contract as fallback dead drop. Static analysis yielded nothing — full C2 infrastructure, persistence and contract address recovered dynamically against a simulated internet. Seizing the C2 domain does not disrupt the botnet. |
+| [BLOATDROP](analysis/bloatdrop.md) | `c9082f7...f3c32d37c` | Go loader in an 86 MB file, 96.9% of it random padding. Gates on a scored 13-check sandbox suite needing only 8 to pass, then resolves its C2 from a codeword posted on actor-controlled Telegram, Pinterest and Steam profiles. Carries no payload. Cracked by patching one byte in the PE subsystem field, which exposed the author’s own verbose debug log. |
 
 ---
 
@@ -36,6 +37,7 @@ scripts/      Analysis tooling
 | [`xortor.yar`](yara/xortor.yar) | XORTOR — encrypted payload, dropper, JScript modules, C2 fragments, screen capture | [XORTOR](analysis/xortor.md) |
 | [`salat.yar`](yara/salat.yar) | SALAT — Go module path, dependency-intersection fingerprint, exact build ID | [SALAT](analysis/salat.md) |
 | [`polydrop.yar`](yara/polydrop.yar) | POLYDROP — crypter section geometry (string-free, structural), camouflage import set | [POLYDROP](analysis/polydrop.md) |
+| [`bloatdrop.yar`](yara/bloatdrop.yar) | BLOATDROP — exact-mebibyte overlay padding on a Go PE64 (structural); dead-drop config and sandbox-gate labels (memory only) | [BLOATDROP](analysis/bloatdrop.md) |
 
 ### Behavioural (Sigma)
 
@@ -43,6 +45,8 @@ scripts/      Analysis tooling
 |---|---|---|
 | [`polydrop_fake_programdata_path.yml`](sigma/polydrop_fake_programdata_path.yml) | Execution and file creation under `%LOCALAPPDATA%\ProgramData\` — a directory Windows does not have | [POLYDROP](analysis/polydrop.md) |
 | [`polydrop_blockchain_deaddrop.yml`](sigma/polydrop_blockchain_deaddrop.yml) | Blockchain RPC lookups from non-browser processes; hijack of the Compatibility Appraiser task | [POLYDROP](analysis/polydrop.md) |
+| [`bloatdrop_headless_browser_theft.yml`](sigma/bloatdrop_headless_browser_theft.yml) | Headless browser started against an empty throwaway profile with logging suppressed — the shape of an App-Bound Encryption bypass | [BLOATDROP](analysis/bloatdrop.md) |
+| [`bloatdrop_social_deaddrop.yml`](sigma/bloatdrop_social_deaddrop.yml) | Telegram, Pinterest and Steam resolved by a non-browser process | [BLOATDROP](analysis/bloatdrop.md) |
 
 `UserInitMprLogonScript` persistence is deliberately **not** duplicated here — it
 is already covered by *Potential Persistence Via Logon Scripts — Registry* (Tom
@@ -50,6 +54,11 @@ Ueltschi) in the Sigma Integrated Rule Set.
 
 Mutex creation has no Sigma rule because Sysmon does not log it by default;
 `Global\85B6839F7FF0A23D` remains an IOC for memory and handle enumeration only.
+
+BLOATDROP's self-delete is deliberately **not** duplicated here — `rmdir /s /q` is
+already covered by *Directory Removal Via Rmdir* (frack113) in the Sigma
+Integrated Rule Set, and `Glasikprostik` is a mutex, so the note above applies to
+it too.
 
 ---
 
@@ -81,8 +90,9 @@ Mutex creation has no Sigma rule because Sysmon does not log it by default;
 |---|---|---|---|
 | [`polydrop.yar`](yara/polydrop.yar) | ✅ | ✅ | 6,977 PE files, incl. 1,464 Wine PE64 |
 | [`salat.yar`](yara/salat.yar) | ✅ | ✅ | 2 Go Windows PE + 230,767 files |
-| [`xortor.yar`](yara/xortor.yar) | ✅ | ⚠️ **partial** | Revised 2026-08-19; **not re-tested against the original samples**, which were unavailable. Corrections are verifiable by inspection and by CI. |
-| [`sigma/`](sigma/) | ✅ syntax | ❌ **untested** | No telemetry corpus was available. Treat as `experimental`. |
+| [`bloatdrop.yar`](yara/bloatdrop.yar) | ❌ **not compiled** | ❌ **untested** | Written while the sample and the clean corpus were inside the analysis VMs and unreachable from the host. Treat as a hypothesis. |
+| [`xortor.yar`](yara/xortor.yar) | ✅ | ⚠️ **partial** | Revised 2026-08-19; **not re-tested against the original samples**, which were unavailable. Corrections are verifiable by inspection. |
+| [`sigma/`](sigma/) | ⚠️ **partial** | ❌ **untested** | No telemetry corpus was available. The POLYDROP rules were syntax-checked; the BLOATDROP pair was not. Treat all as `experimental`. |
 
 Untested content is labelled rather than omitted, and labelled here rather than only in a commit message.
 
