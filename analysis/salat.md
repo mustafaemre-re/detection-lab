@@ -12,7 +12,7 @@
 | 1 | `1fce06baa55f455053a1d5094513a1d509d14cc0270241d329d287feb9a66820` |
 
 Name assigned from the module path embedded in the Go build metadata (`path salat`).
-**No attribution search was performed** — see §13. Treat SALAT as a local handle, not a claim that the family is unnamed.
+**No attribution search was performed** — see §13, and [repo policy](../README.md#attribution-is-out-of-scope--deliberately). Treat SALAT as a local handle, not a claim that the family is unnamed.
 
 ---
 

@@ -14,7 +14,9 @@
 **BLOATDROP is a local handle, not an attribution claim.** It is derived from
 the sample's two defining characteristics — 84 MiB of **bloat** padding, and a
 social-media dead **drop** resolver. **No attribution search was performed**
-(§8.4), so this family may already have a published name. Do not propagate the
+(§8.4) — that is
+[repo policy](../README.md#attribution-is-out-of-scope--deliberately), not an
+omission. This family may already have a published name; do not propagate the
 label until that is checked.
 
 ---

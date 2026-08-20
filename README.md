@@ -103,3 +103,29 @@ Untested content is labelled rather than omitted, and labelled here rather than 
 No samples are hosted here. Reports reference SHA-256 hashes; retrieve samples from MalwareBazaar or an equivalent source.
 
 Everything published here is for defensive purposes: detection, threat intelligence, and incident response.
+
+### Attribution is out of scope — deliberately
+
+Every report here names its subject with a local handle (XORTOR, SALAT,
+POLYDROP, BLOATDROP) and states that **no attribution search was performed**.
+That is policy, not an omission, and it applies to all future reports unless a
+report says otherwise.
+
+Two reasons.
+
+**It risks burning the indicators.** Attribution work means touching
+operator-controlled infrastructure: viewing dead-drop profiles, resolving C2
+hosts, querying registrars. Done from an attributable address it tells the
+operator someone is looking, and they rotate. The indicators in these reports
+then go stale for everyone relying on them, not only for me. BLOATDROP §8.4
+works through this in detail.
+
+**A handle is falsifiable; a family name is not.** `POLYDROP` claims nothing
+except that this report needed a word for the thing. Asserting a family name
+without the corpus to support it manufactures a link that a reader cannot check
+and that later reporting has to unpick.
+
+The consequence is stated plainly in each report: **the family may already have
+a published name.** Do not propagate these handles as family names. If you need
+attribution, archived copies of actor infrastructure and third-party enrichment
+platforms carry none of the risk above and are the correct route.

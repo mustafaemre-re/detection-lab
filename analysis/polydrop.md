@@ -14,9 +14,10 @@
 **POLYDROP is a local handle, not an attribution claim.** It is derived from
 the sample's defining characteristic — a **Poly**gon smart contract used as a
 C2 dead **drop** — and is used here only so the report has something to call
-the thing. **No attribution search was performed** (§8.2), so this family may
-already have a published name. Do not propagate the label until that is
-checked.
+the thing. **No attribution search was performed** (§8.2) — that is
+[repo policy](../README.md#attribution-is-out-of-scope--deliberately), not an
+omission. This family may already have a published name. Do not propagate the
+label until that is checked.
 
 ---
 
